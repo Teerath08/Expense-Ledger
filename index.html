@@ -436,7 +436,7 @@
           <div class="form-grid">
             <div class="field field-desc">
               <label for="desc"><span data-i18n="descLabel">What was it for?</span> <span class="label-hint" data-i18n="optional">(optional)</span></label>
-              <input type="text" id="desc" maxlength="80" placeholder="e.g. Lunch at the cafeteria" data-i18n-placeholder="descPlaceholder" autocomplete="off">
+              <input type="text" id="desc" maxlength="80" placeholder="e.g. Lunch at the cafeteria" autocomplete="off">
             </div>
             <div class="field">
               <label for="amount" data-i18n="amountLabel">Amount</label>
@@ -597,7 +597,13 @@
       categoryGroup: "Category",
       descLabel: "What was it for?",
       optional: "(optional)",
-      descPlaceholder: "e.g. Lunch at the cafeteria",
+      descPlaceholder_food: "e.g. Lunch at the cafeteria",
+      descPlaceholder_transport: "e.g. Metro card recharge",
+      descPlaceholder_shopping: "e.g. New headphones",
+      descPlaceholder_bills: "e.g. Electricity bill",
+      descPlaceholder_entertainment: "e.g. Movie tickets",
+      descPlaceholder_health: "e.g. Pharmacy medicines",
+      descPlaceholder_other: "e.g. Gift for a friend",
       amountLabel: "Amount",
       quickGroup: "Quick amounts",
       quickLabel: "Quick amounts",
@@ -725,7 +731,13 @@
       categoryGroup: "श्रेणी",
       descLabel: "किस चीज़ पर खर्च किया?",
       optional: "(वैकल्पिक)",
-      descPlaceholder: "जैसे: कैंटीन में दोपहर का खाना",
+      descPlaceholder_food: "जैसे: कैंटीन में दोपहर का खाना",
+      descPlaceholder_transport: "जैसे: मेट्रो कार्ड रिचार्ज",
+      descPlaceholder_shopping: "जैसे: नए हेडफ़ोन",
+      descPlaceholder_bills: "जैसे: बिजली का बिल",
+      descPlaceholder_entertainment: "जैसे: फ़िल्म की टिकट",
+      descPlaceholder_health: "जैसे: दवाइयाँ",
+      descPlaceholder_other: "जैसे: दोस्त के लिए तोहफ़ा",
       amountLabel: "रकम",
       quickGroup: "झटपट रकम",
       quickLabel: "झटपट रकम",
@@ -1294,6 +1306,10 @@
       btn.classList.toggle("active", Number(btn.dataset.amount) === value);
     });
   }
+  function updateDescPlaceholder() {
+    const key = "descPlaceholder_" + (CAT.has(activeCategory) ? activeCategory : "other");
+    el.desc.placeholder = t(key);
+  }
   function buildLimitInputs() {
     el.limitGrid.innerHTML = CATEGORIES.map(c =>
       '<label class="limit-field"><span data-limit-label="' + c.id + '">' + c.icon + " " + esc(catLabel(c.id)) + "</span>" +
@@ -1327,6 +1343,7 @@
     el.formError.hidden = true;
     activeCategory = "food";
     updateCatChips();
+    updateDescPlaceholder();
     updateQuickSelection();
   }
   function showFormError(message) {
@@ -1356,6 +1373,7 @@
     editingId = entry.id;
     activeCategory = entry.category;
     updateCatChips();
+    updateDescPlaceholder();
     el.desc.value = entry.reason;
     el.amount.value = entry.amount;
     el.formError.hidden = true;
@@ -1812,6 +1830,7 @@
     el.langSelect.value = lang;
     buildCatChips();
     buildQuickAmounts();
+    updateDescPlaceholder();
     updateLimitLabels();
     setFormMode(Boolean(editingId));
     el.formError.hidden = true;
@@ -1843,6 +1862,7 @@
     if (!button) return;
     activeCategory = button.dataset.cat;
     updateCatChips();
+    updateDescPlaceholder();
     el.amount.focus();
   });
 
