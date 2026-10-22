@@ -490,7 +490,7 @@
                 <label for="budgetInput" data-i18n="monthlyBudgetLabel">Monthly budget</label>
                 <div class="amount-wrap">
                   <span aria-hidden="true">₹</span>
-                  <input type="number" id="budgetInput" inputmode="decimal" min="1" step="100">
+                  <input type="number" id="budgetInput" inputmode="decimal" min="0" step="100">
                 </div>
               </div>
               <p class="hint" data-i18n="budgetHint">Category limits are guidance for each category — they don't have to add up to your monthly budget.</p>
@@ -557,8 +557,8 @@
     { id: "other", label: "Other", icon: "📌" }
   ];
   const CAT = new Map(CATEGORIES.map(c => [c.id, c]));
-  const DEFAULT_BUDGET = 10000;
-  const DEFAULT_LIMITS = { food: 2500, transport: 1500, shopping: 2000, bills: 1000, entertainment: 1000, health: 800, other: 1200 };
+  const DEFAULT_BUDGET = 0;
+  const DEFAULT_LIMITS = { food: 0, transport: 0, shopping: 0, bills: 0, entertainment: 0, health: 0, other: 0 };
   const STORAGE_KEY = "pocketwise_ledger_v1";
   const LANG_KEY = "pocketwise_lang_v1";
   const QUICK_AMOUNTS = [10, 20, 50, 100, 200, 500];
@@ -640,10 +640,13 @@
       emptyCategorySub: "Add a {category} expense above or choose another category.",
       summaryNothing: "Nothing logged yet",
       summaryUsed: "{pct}% of budget used",
+      summarySpentNoBudget: "{amount} spent · no budget set",
+      summaryNoBudget: "Set a budget to see what's left",
       summaryOverBy: "Over budget by {amount}",
       summaryPerDay: "{amount}/day · {days} days left",
       summaryPerDayOne: "{amount}/day · 1 day left",
       summaryLeftMonth: "Left in this month",
+      statusNoBudget: "No budget set yet — add a monthly budget in Budget & category limits.",
       statusNoCurrent: "No expenses logged yet this month — add your first one below.",
       statusNoPast: "No expenses were logged in {month}.",
       statusOver: "You're {amount} over budget this month. Adjust the budget or pause non-essentials.",
@@ -666,7 +669,7 @@
       toastAllDeleted: "All expenses deleted",
       toastNoDelete: "There are no expenses to delete.",
       toastBudgetUpdated: "Budgets updated",
-      toastBudgetError: "Enter a monthly budget greater than zero.",
+      toastBudgetError: "Enter a monthly budget of zero or more.",
       toastLimitError: "Enter a limit of zero or more for {category}.",
       toastCsv: "CSV downloaded",
       toastNoCsv: "No expenses to export for this month.",
@@ -767,10 +770,13 @@
       emptyCategorySub: "ऊपर {category} का खर्च जोड़ें या दूसरी श्रेणी चुनें।",
       summaryNothing: "अभी कुछ दर्ज नहीं",
       summaryUsed: "बजट का {pct}% इस्तेमाल",
+      summarySpentNoBudget: "{amount} खर्च · कोई बजट सेट नहीं",
+      summaryNoBudget: "बची रकम देखने के लिए बजट सेट करें",
       summaryOverBy: "बजट से {amount} ज़्यादा",
       summaryPerDay: "{amount}/दिन · {days} दिन बाकी",
       summaryPerDayOne: "{amount}/दिन · 1 दिन बाकी",
       summaryLeftMonth: "इस महीने के लिए बचा",
+      statusNoBudget: "अभी कोई बजट सेट नहीं — बजट और श्रेणी सीमाएँ में मासिक बजट जोड़ें।",
       statusNoCurrent: "इस महीने अभी कोई खर्च दर्ज नहीं — नीचे पहला खर्च जोड़ें।",
       statusNoPast: "{month} में कोई खर्च दर्ज नहीं हुआ।",
       statusOver: "इस महीने बजट से {amount} ज़्यादा खर्च हो गया। बजट बदलें या गैर-ज़रूरी खर्च रोकें।",
@@ -793,7 +799,7 @@
       toastAllDeleted: "सभी खर्च हटा दिए गए",
       toastNoDelete: "हटाने के लिए कोई खर्च नहीं है।",
       toastBudgetUpdated: "बजट अपडेट हो गया",
-      toastBudgetError: "शून्य से ज़्यादा मासिक बजट डालें।",
+      toastBudgetError: "शून्य या उससे ज़्यादा मासिक बजट डालें।",
       toastLimitError: "{category} के लिए शून्य या उससे ज़्यादा सीमा डालें।",
       toastCsv: "CSV डाउनलोड हो गया",
       toastNoCsv: "इस महीने का कोई खर्च डाउनलोड करने के लिए नहीं है।",
@@ -972,7 +978,7 @@
     const clean = { entries: [], budget: DEFAULT_BUDGET, limits: Object.assign({}, DEFAULT_LIMITS) };
     if (!raw || typeof raw !== "object") return clean;
     const budget = Number(raw.budget);
-    if (Number.isFinite(budget) && budget > 0) clean.budget = round2(budget);
+    if (Number.isFinite(budget) && budget >= 0) clean.budget = round2(budget);
     if (raw.limits && typeof raw.limits === "object") {
       CATEGORIES.forEach(c => {
         const value = Number(raw.limits[c.id]);
@@ -1073,14 +1079,23 @@
 
   function renderSummary(spent, left, isCurrent) {
     const now = new Date();
-    const pct = Math.round((spent / state.budget) * 100);
+    const hasBudget = state.budget > 0;
+    const pct = hasBudget ? Math.round((spent / state.budget) * 100) : 0;
     el.statBudget.textContent = money(state.budget);
     el.statSpent.textContent = money(spent);
     el.statLeft.textContent = money(left);
-    el.statSpentSub.textContent = spent === 0 ? t("summaryNothing") : t("summaryUsed", { pct: pct });
+    if (spent === 0) {
+      el.statSpentSub.textContent = t("summaryNothing");
+    } else if (!hasBudget) {
+      el.statSpentSub.textContent = t("summarySpentNoBudget", { amount: money(spent) });
+    } else {
+      el.statSpentSub.textContent = t("summaryUsed", { pct: pct });
+    }
     el.sumLeft.classList.toggle("red", left < 0);
     el.sumLeft.classList.toggle("green", left >= 0);
-    if (left < 0) {
+    if (!hasBudget) {
+      el.statLeftSub.textContent = t("summaryNoBudget");
+    } else if (left < 0) {
       el.statLeftSub.textContent = t("summaryOverBy", { amount: money(-left) });
     } else if (isCurrent) {
       const daysLeft = daysInMonth(now) - now.getDate() + 1;
@@ -1096,9 +1111,11 @@
   function renderStatus(spent, left, isCurrent) {
     const now = new Date();
     const daysLeft = daysInMonth(now) - now.getDate() + 1;
-    const pct = Math.round((spent / state.budget) * 100);
+    const pct = state.budget > 0 ? Math.round((spent / state.budget) * 100) : 0;
     let tone = "neutral", icon = "💡", text = "";
-    if (spent === 0) {
+    if (state.budget <= 0) {
+      text = t("statusNoBudget");
+    } else if (spent === 0) {
       text = isCurrent
         ? t("statusNoCurrent")
         : t("statusNoPast", { month: monthLabelText() });
@@ -1244,7 +1261,7 @@
     const isCurrent = monthKeyOf(view) === monthKeyOf(now);
     const entries = monthEntries();
     const spent = round2(entries.reduce((sum, entry) => sum + entry.amount, 0));
-    const left = round2(state.budget - spent);
+    const left = state.budget > 0 ? round2(state.budget - spent) : 0;
     renderMonthNav();
     renderSummary(spent, left, isCurrent);
     renderStatus(spent, left, isCurrent);
@@ -1461,7 +1478,7 @@
   function handleBudgetSubmit(ev) {
     ev.preventDefault();
     const budget = Number(el.budgetInput.value);
-    if (!Number.isFinite(budget) || budget <= 0) {
+    if (!Number.isFinite(budget) || budget < 0) {
       showToast(t("toastBudgetError"));
       el.budgetInput.focus();
       return;
