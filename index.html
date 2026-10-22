@@ -1026,7 +1026,7 @@
       html += '<section class="day-group"><h3 class="day-label">' + esc(label) + '</h3><ul class="txn-list">';
       list.forEach(entry => {
         const cat = CAT.get(entry.category) || CAT.get("other");
-        const time = new Date(entry.ts).toLocaleTimeString(dateLocale(), { hour: "2-digit", minute: "2-digit", hour12: false, numberingSystem: "latn" });
+        const time = new Date(entry.ts).toLocaleTimeString(dateLocale(), { hour: "numeric", minute: "2-digit", hour12: true, numberingSystem: "latn" });
         const reason = entry.reason || catLabel(cat.id);
         const meta = entry.reason ? esc(catLabel(cat.id)) + " · " + esc(time) : esc(time);
         html += '<li class="txn" data-id="' + esc(entry.id) + '">' +
@@ -1360,7 +1360,7 @@
       const date = new Date(entry.ts);
       rows.push([
         date.getFullYear() + "-" + pad2(date.getMonth() + 1) + "-" + pad2(date.getDate()),
-        pad2(date.getHours()) + ":" + pad2(date.getMinutes()),
+        date.toLocaleTimeString(dateLocale(), { hour: "numeric", minute: "2-digit", hour12: true, numberingSystem: "latn" }),
         catLabel(entry.category),
         entry.reason || catLabel(entry.category),
         entry.amount.toFixed(2)
