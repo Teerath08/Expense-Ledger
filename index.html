@@ -931,6 +931,9 @@
   function dateLocale() {
     return lang === "hi" ? "hi-IN" : "en-IN";
   }
+  function slashDate(date) {
+    return date.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric", numberingSystem: "latn" });
+  }
 
   const pad2 = n => String(n).padStart(2, "0");
   const monthKeyOf = date => date.getFullYear() + "-" + pad2(date.getMonth() + 1);
@@ -1212,8 +1215,8 @@
     groups.forEach((list, key) => {
       const date = new Date(list[0].ts);
       let label = date.toLocaleDateString(dateLocale(), { weekday: "short", day: "numeric", month: "short", year: "numeric", numberingSystem: "latn" });
-      if (key === todayKey) label = t("today");
-      else if (key === yesterdayKey) label = t("yesterday");
+      if (key === todayKey) label = t("today") + " (" + slashDate(date) + ")";
+      else if (key === yesterdayKey) label = t("yesterday") + " (" + slashDate(date) + ")";
       html += '<section class="day-group"><h3 class="day-label">' + esc(label) + '</h3><ul class="txn-list">';
       list.forEach(entry => {
         const cat = CAT.get(entry.category) || CAT.get("other");
