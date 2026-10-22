@@ -81,6 +81,10 @@
   .page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:20px;}
   .page-head h1{font-family:Outfit,"Noto Sans Devanagari",sans-serif;font-size:clamp(26px,4vw,34px);font-weight:700;letter-spacing:-.02em;margin:0 0 4px;line-height:1.15;}
   .page-head p{margin:0;color:var(--muted);font-size:14.5px;max-width:560px;}
+  .tour-btn{display:inline-flex;align-items:center;gap:7px;height:34px;margin-top:11px;padding:0 13px 0 6px;border:1px solid #DDD6FE;border-radius:999px;background:linear-gradient(180deg,#fff,#FBFAFF);color:var(--primary-dark);font-size:12.5px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(108,99,255,.07);transition:border-color .15s,background .15s,transform .15s,box-shadow .15s;}
+  .tour-btn:hover{border-color:var(--primary);background:#fff;transform:translateY(-1px);box-shadow:0 6px 16px rgba(108,99,255,.16);}
+  .tour-btn:active{transform:translateY(0) scale(.98);}
+  .tour-btn-ico{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;font-family:Outfit,"Noto Sans Devanagari",sans-serif;font-size:12px;font-weight:800;box-shadow:0 2px 6px rgba(108,99,255,.28);}
   .month-nav{display:flex;align-items:center;gap:2px;background:#fff;border:1px solid var(--border);border-radius:999px;padding:4px;box-shadow:var(--shadow-card);}
   .month-btn{width:34px;height:34px;border:0;border-radius:50%;background:transparent;color:var(--muted);font-size:20px;line-height:1;cursor:pointer;}
   .month-btn:hover:not(:disabled){background:var(--surface2);color:var(--primary);}
@@ -222,6 +226,45 @@
   .limit-field input{height:38px;font-size:14px;font-variant-numeric:tabular-nums;}
   .data-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px dashed var(--border);}
 
+  /* Interactive tutorial */
+  body.tour-open{overflow:hidden;}
+  .tour-layer{position:fixed;inset:0;z-index:220;overscroll-behavior:none;}
+  .tour-layer[hidden]{display:none;}
+  .tour-backdrop{position:fixed;inset:0;background:rgba(18,16,38,.62);opacity:0;pointer-events:none;transition:opacity .2s ease;}
+  .tour-layer.final .tour-backdrop{opacity:1;}
+  .tour-spot{position:fixed;z-index:1;border-radius:12px;pointer-events:none;box-shadow:0 0 0 9999px rgba(18,16,38,.68),0 0 0 3px rgba(139,133,255,.72);transition:left .24s cubic-bezier(.2,.8,.2,1),top .24s cubic-bezier(.2,.8,.2,1),width .24s cubic-bezier(.2,.8,.2,1),height .24s cubic-bezier(.2,.8,.2,1);}
+  .tour-spot[hidden]{display:none;}
+  .tour-spot::after{content:"";position:absolute;inset:-7px;border:2px solid rgba(139,133,255,.8);border-radius:17px;animation:tourPulse 1.8s ease-out infinite;}
+  .tour-bubble{position:fixed;z-index:2;width:min(380px,calc(100vw - 28px));max-height:calc(100vh - 24px);overflow:auto;overscroll-behavior:contain;padding:16px 18px 15px;border:1px solid rgba(255,255,255,.75);border-radius:20px;background:#fff;box-shadow:0 24px 70px rgba(10,6,40,.4);opacity:0;transform:translateY(8px) scale(.985);transition:opacity .2s ease,transform .24s cubic-bezier(.2,.8,.2,1);outline:none;}
+  .tour-layer.show .tour-bubble{opacity:1;transform:none;}
+  .tour-bubble::after{content:"";position:absolute;width:14px;height:14px;border-radius:3px;background:#fff;transform:rotate(45deg);}
+  .tour-bubble.below::after{top:-7px;left:calc(var(--arrow,50%) - 7px);border-left:1px solid #E9E6F7;border-top:1px solid #E9E6F7;}
+  .tour-bubble.above::after{bottom:-7px;left:calc(var(--arrow,50%) - 7px);border-right:1px solid #E9E6F7;border-bottom:1px solid #E9E6F7;}
+  .tour-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;}
+  .tour-step{font-size:10.5px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--primary);}
+  html[lang="hi"] .tour-step{letter-spacing:.03em;text-transform:none;font-size:11px;}
+  .tour-skip{height:26px;padding:0 8px;border:0;border-radius:7px;background:transparent;color:var(--muted2);font-size:11.5px;font-weight:600;cursor:pointer;}
+  .tour-skip:hover{background:var(--surface2);color:var(--ink);}
+  .tour-icon{width:46px;height:46px;margin-bottom:10px;border-radius:14px;display:grid;place-items:center;font-size:23px;background:radial-gradient(circle at 30% 20%,#F1EEFF,#E7E1FF 72%);border:1px solid #E4DEFF;box-shadow:0 8px 18px rgba(108,99,255,.13);}
+  .tour-title{font-family:Outfit,"Noto Sans Devanagari",sans-serif;margin:0 0 5px;font-size:20px;line-height:1.25;letter-spacing:-.015em;}
+  .tour-body{margin:0;color:var(--muted);font-size:13.5px;line-height:1.58;}
+  .tour-tip{margin-top:11px;padding:9px 11px;border:1px solid #EAE6FF;border-radius:10px;background:#F8F6FF;color:var(--primary-dark);font-size:12px;line-height:1.48;}
+  .tour-tip:empty{display:none;}
+  .tour-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:15px;padding-top:13px;border-top:1px solid var(--border);}
+  .tour-dots{display:flex;align-items:center;gap:5px;}
+  .tour-dot{width:6px;height:6px;border-radius:999px;background:#E4E0F4;transition:width .25s,background .25s;}
+  .tour-dot.active{width:19px;background:linear-gradient(90deg,var(--primary),var(--primary-light));}
+  .tour-actions{display:flex;align-items:center;gap:7px;flex-shrink:0;}
+  .tour-actions .btn-primary,.tour-actions .btn-ghost{height:38px;}
+  .tour-actions .btn-primary{min-width:84px;padding:0 16px;font-size:13.5px;}
+  .tour-actions .btn-ghost{padding:0 12px;font-size:13px;}
+  .tour-back:disabled{opacity:.4;cursor:default;}
+  .tour-back:disabled:hover{border-color:var(--border);color:var(--muted);}
+  .tour-btn:focus-visible,.tour-skip:focus-visible,.tour-back:focus-visible,.tour-next:focus-visible,.tour-bubble:focus-visible{outline:3px solid rgba(108,99,255,.3);outline-offset:2px;}
+  .tour-bubble.step-in .tour-icon,.tour-bubble.step-in .tour-copy,.tour-bubble.step-in .tour-tip{animation:tourCopyIn .26s cubic-bezier(.2,.8,.2,1);}
+  @keyframes tourPulse{0%{opacity:.7;transform:scale(1);}70%,100%{opacity:0;transform:scale(1.045);}}
+  @keyframes tourCopyIn{from{opacity:.25;transform:translateY(5px);}to{opacity:1;transform:none;}}
+
   /* Toast */
   .toast{position:fixed;z-index:150;left:50%;bottom:calc(22px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;gap:16px;max-width:calc(100vw - 28px);padding:12px 16px;border-radius:12px;background:var(--ink);color:#fff;box-shadow:0 14px 40px rgba(0,0,0,.28);opacity:0;pointer-events:none;transform:translate(-50%,12px);transition:opacity .22s ease,transform .22s ease;}
   .toast.show{opacity:1;pointer-events:auto;transform:translate(-50%,0);}
@@ -275,6 +318,18 @@
     .lang-select{width:78px;padding:0 5px;font-size:11.5px;}
     .export-label{display:none;}
     #exportBtn{width:40px;padding:0;}
+    .tour-bubble{width:calc(100vw - 20px);max-height:calc(100vh - 20px);max-height:calc(100dvh - 20px);padding:14px 15px 13px;border-radius:18px;}
+    .tour-title{font-size:18px;}
+    .tour-body{font-size:13px;}
+    .tour-icon{width:40px;height:40px;font-size:20px;border-radius:12px;}
+    .tour-foot{gap:7px;}
+    .tour-actions .btn-primary{min-width:76px;padding:0 12px;}
+    .tour-actions .btn-ghost{padding:0 10px;}
+  }
+  @media (max-width:360px){
+    .tour-foot{flex-wrap:wrap;}
+    .tour-actions{width:100%;}
+    .tour-actions .btn-primary{flex:1;}
   }
   @media (max-width:430px){
     .brand-sub{display:none;}
@@ -293,7 +348,7 @@
     *,*::before,*::after{animation-duration:.01ms !important;animation-delay:0ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;transition-delay:0ms !important;}
   }
   @media print{
-    .topbar,.page-head,.entry-card,.txn-tools,.txn-cats,.txn-actions,.settings,.data-actions,.toast,.status,.foot,.summary .card-link{display:none !important;}
+    .topbar,.page-head,.entry-card,.txn-tools,.txn-cats,.txn-actions,.settings,.data-actions,.toast,.tour-layer,.status,.foot,.summary .card-link{display:none !important;}
     body{background:#fff;}
     .wrap{max-width:100%;padding:0;}
     .layout{display:block;}
@@ -333,6 +388,10 @@
     <div>
       <h1 data-i18n="pageHeading">Expense ledger</h1>
       <p data-i18n="pageSubtitle">Log what you spend, watch each category, and stay inside your monthly budget.</p>
+      <button type="button" class="tour-btn" id="tourBtn" aria-haspopup="dialog" aria-controls="tourOverlay" aria-label="Open the step-by-step tutorial" data-i18n-aria-label="tourOpenAria">
+        <span class="tour-btn-ico" aria-hidden="true">?</span>
+        <span data-i18n="tourOpen">Tutorial</span>
+      </button>
     </div>
     <div class="month-nav" role="group" aria-label="Choose month" data-i18n-aria-label="chooseMonth">
       <button type="button" class="month-btn" id="prevMonth" aria-label="Previous month" data-i18n-aria-label="prevMonth">‹</button>
@@ -460,6 +519,30 @@
   <button type="button" id="toastAction" hidden>Undo</button>
 </div>
 
+<div class="tour-layer" id="tourOverlay" hidden>
+  <div class="tour-backdrop" id="tourBackdrop" aria-hidden="true"></div>
+  <div class="tour-spot" id="tourSpot" aria-hidden="true"></div>
+  <div class="tour-bubble" id="tourBubble" role="dialog" aria-modal="true" aria-labelledby="tourTitle" aria-describedby="tourBody" tabindex="-1">
+    <div class="tour-top">
+      <span class="tour-step" id="tourStepLabel"></span>
+      <button type="button" class="tour-skip" id="tourSkip" data-i18n="tourSkip">Skip</button>
+    </div>
+    <div class="tour-icon" id="tourIcon" aria-hidden="true">👋</div>
+    <div class="tour-copy" aria-live="polite">
+      <h2 class="tour-title" id="tourTitle">Welcome to PocketWise</h2>
+      <p class="tour-body" id="tourBody"></p>
+    </div>
+    <div class="tour-tip" id="tourTip"></div>
+    <div class="tour-foot">
+      <div class="tour-dots" id="tourDots" aria-hidden="true"></div>
+      <div class="tour-actions">
+        <button type="button" class="btn-ghost tour-back" id="tourBack" data-i18n="tourBack">Back</button>
+        <button type="button" class="btn-primary tour-next" id="tourNext">Next</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   "use strict";
@@ -493,6 +576,13 @@
       budgetSettingsTitle: "Budget settings",
       pageHeading: "Expense ledger",
       pageSubtitle: "Log what you spend, watch each category, and stay inside your monthly budget.",
+      tourOpen: "Tutorial",
+      tourOpenAria: "Open the step-by-step tutorial",
+      tourSkip: "Skip",
+      tourBack: "Back",
+      tourNext: "Next",
+      tourFinish: "Start tracking",
+      tourStepCount: "Step {n} of {total}",
       chooseMonth: "Choose month",
       prevMonth: "Previous month",
       nextMonth: "Next month",
@@ -613,6 +703,13 @@
       budgetSettingsTitle: "बजट सेटिंग",
       pageHeading: "खर्च बही",
       pageSubtitle: "अपने खर्च दर्ज करें, हर श्रेणी पर नज़र रखें और मासिक बजट में रहें।",
+      tourOpen: "ट्यूटोरियल",
+      tourOpenAria: "स्टेप-बाय-स्टेप ट्यूटोरियल खोलें",
+      tourSkip: "छोड़ें",
+      tourBack: "पीछे",
+      tourNext: "आगे",
+      tourFinish: "शुरू करें",
+      tourStepCount: "चरण {n} / {total}",
       chooseMonth: "महीना चुनें",
       prevMonth: "पिछला महीना",
       nextMonth: "अगला महीना",
@@ -725,6 +822,93 @@
     }
   };
 
+  const TOUR_STEPS = {
+    en: [
+      {
+        target: ".page-head", icon: "👋", title: "Welcome to PocketWise",
+        body: "This is your private expense ledger. In a few quick steps, I'll show you how to add an expense and understand your month.",
+        tip: "You can reopen this tutorial any time from the Tutorial button."
+      },
+      {
+        target: "#catChips", icon: "🗂️", title: "Pick a category",
+        body: "Start by choosing what you spent on. Tap Food, Transport, Shopping, Bills, Entertainment, Health, or Other.",
+        tip: "The selected category turns purple."
+      },
+      {
+        target: "#amount", icon: "💸", title: "Enter the amount",
+        body: "Type how much you spent, or tap a quick amount for common spends.",
+        tip: "Quick amounts: ₹10, ₹20, ₹50, ₹100, ₹200 and ₹500."
+      },
+      {
+        target: "#submitBtn", icon: "✅", title: "Add it to your ledger",
+        body: "Tap Add expense. The date and time are saved automatically — there is no date field to fill.",
+        tip: "Add a short note first if you want to remember what it was for."
+      },
+      {
+        target: ".summary", icon: "📊", title: "See your month",
+        body: "These cards show your budget, total spent, and money left. Use the month arrows to look back at earlier months.",
+        tip: "Open Budget & category limits to set your own monthly budget."
+      },
+      {
+        target: "#txnCats", icon: "🔎", title: "Filter your spending",
+        body: "Tap a category to see only those expenses. Tap it again to return to everything. You can search by note too.",
+        tip: "The number on each category shows how many expenses it has this month."
+      },
+      {
+        target: ".top-actions", icon: "🌐", title: "Language and settings",
+        body: "Switch between English and हिन्दी, export your records as a CSV, or open budget settings with the gear.",
+        tip: "Your entries stay private in this browser. Clearing site data removes them."
+      },
+      {
+        target: null, icon: "🎉", title: "You're ready!",
+        body: "Start with your first expense. Add as many as you need — PocketWise keeps the totals and categories organised for you.",
+        tip: "Tap any transaction category in the list to filter the month."
+      }
+    ],
+    hi: [
+      {
+        target: ".page-head", icon: "👋", title: "PocketWise में आपका स्वागत है",
+        body: "यह आपकी निजी खर्च बही है। कुछ आसान चरणों में मैं दिखाऊँगा कि खर्च कैसे जोड़ें और महीने का हिसाब कैसे देखें।",
+        tip: "ट्यूटोरियल बटन से इसे कभी भी फिर खोल सकते हैं।"
+      },
+      {
+        target: "#catChips", icon: "🗂️", title: "श्रेणी चुनें",
+        body: "सबसे पहले चुनें कि खर्च किस चीज़ पर हुआ। खाना, यात्रा, खरीदारी, बिल, मनोरंजन, स्वास्थ्य या अन्य पर टैप करें।",
+        tip: "चुनी हुई श्रेणी बैंगनी रंग में दिखती है।"
+      },
+      {
+        target: "#amount", icon: "💸", title: "रकम भरें",
+        body: "रकम टाइप करें, या आम खर्चों के लिए झटपट रकम पर टैप करें।",
+        tip: "झटपट रकम: ₹10, ₹20, ₹50, ₹100, ₹200 और ₹500।"
+      },
+      {
+        target: "#submitBtn", icon: "✅", title: "खर्च जोड़ें",
+        body: "“खर्च जोड़ें” पर टैप करें। तारीख और समय अपने आप जुड़ जाते हैं — कोई तारीख भरने की ज़रूरत नहीं।",
+        tip: "चाहें तो पहले छोटा विवरण लिखें ताकि याद रहे कि खर्च किस चीज़ पर था।"
+      },
+      {
+        target: ".summary", icon: "📊", title: "महीना देखें",
+        body: "ये तीन कार्ड आपका बजट, कुल खर्च और बची रकम दिखाते हैं। पिछले महीने देखने के लिए तीर दबाएँ।",
+        tip: "अपना मासिक बजट सेट करने के लिए “बजट और श्रेणी सीमाएँ” खोलें।"
+      },
+      {
+        target: "#txnCats", icon: "🔎", title: "खर्च फ़िल्टर करें",
+        body: "किसी श्रेणी पर टैप करें तो सिर्फ़ उसी श्रेणी के खर्च दिखेंगे। सभी देखने के लिए उसी श्रेणी को फिर टैप करें। विवरण से खोज भी सकते हैं।",
+        tip: "हर श्रेणी पर लिखा नंबर बताता है कि इस महीने उस श्रेणी में कितने खर्च हैं।"
+      },
+      {
+        target: ".top-actions", icon: "🌐", title: "भाषा और सेटिंग",
+        body: "English और हिन्दी के बीच बदलें, अपने रिकॉर्ड CSV में डाउनलोड करें, या गियर से बजट सेटिंग खोलें।",
+        tip: "आपके खर्च इसी ब्राउज़र में निजी रहते हैं। साइट डेटा हटाने पर वे हट जाएँगे।"
+      },
+      {
+        target: null, icon: "🎉", title: "अब आप तैयार हैं!",
+        body: "अपना पहला खर्च जोड़कर शुरुआत करें। PocketWise आपके कुल खर्च और श्रेणियों का हिसाब अपने आप रखेगा।",
+        tip: "सुझाव: सूची में किसी श्रेणी पर टैप करके उस महीने के खर्च फ़िल्टर करें।"
+      }
+    ]
+  };
+
   let lang = "en";
   try {
     const savedLang = localStorage.getItem(LANG_KEY);
@@ -831,6 +1015,10 @@
   let lastDeleted = null;
   let filter = { q: "", cat: "all" };
   let viewChanged = false;
+  let tourIndex = 0;
+  let tourReturnFocus = null;
+  let tourCloseTimer = null;
+  let tourScrollTimer = null;
 
   function saveState() {
     if (!storageOK) return;
@@ -853,7 +1041,10 @@
     langSelect: $("langSelect"), settingsBtn: $("settingsBtn"), budgetDetails: $("budgetDetails"), budgetForm: $("budgetForm"),
     budgetInput: $("budgetInput"), limitGrid: $("limitGrid"), sampleBtn: $("sampleBtn"), clearBtn: $("clearBtn"),
     breakdown: $("breakdown"), editBudgetBtn: $("editBudgetBtn"), toast: $("toast"), toastMsg: $("toastMsg"),
-    toastAction: $("toastAction"), year: $("year")
+    toastAction: $("toastAction"), year: $("year"), tourBtn: $("tourBtn"), tourOverlay: $("tourOverlay"),
+    tourBubble: $("tourBubble"), tourSpot: $("tourSpot"), tourBackdrop: $("tourBackdrop"), tourSkip: $("tourSkip"),
+    tourIcon: $("tourIcon"), tourTitle: $("tourTitle"), tourBody: $("tourBody"), tourTip: $("tourTip"),
+    tourStepLabel: $("tourStepLabel"), tourDots: $("tourDots"), tourBack: $("tourBack"), tourNext: $("tourNext")
   };
 
   function updateStorageNote() {
@@ -1026,7 +1217,7 @@
       html += '<section class="day-group"><h3 class="day-label">' + esc(label) + '</h3><ul class="txn-list">';
       list.forEach(entry => {
         const cat = CAT.get(entry.category) || CAT.get("other");
-        const time = new Date(entry.ts).toLocaleTimeString(dateLocale(), { hour: "numeric", minute: "2-digit", hour12: true, numberingSystem: "latn" });
+        const time = new Date(entry.ts).toLocaleTimeString(lang === "hi" ? "en-IN" : "en-IN", { hour: "numeric", minute: "2-digit", hour12: true, numberingSystem: "latn" }).toUpperCase();
         const reason = entry.reason || catLabel(cat.id);
         const meta = entry.reason ? esc(catLabel(cat.id)) + " · " + esc(time) : esc(time);
         html += '<li class="txn" data-id="' + esc(entry.id) + '">' +
@@ -1360,7 +1551,7 @@
       const date = new Date(entry.ts);
       rows.push([
         date.getFullYear() + "-" + pad2(date.getMonth() + 1) + "-" + pad2(date.getDate()),
-        date.toLocaleTimeString(dateLocale(), { hour: "numeric", minute: "2-digit", hour12: true, numberingSystem: "latn" }),
+        date.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true, numberingSystem: "latn" }).toUpperCase(),
         catLabel(entry.category),
         entry.reason || catLabel(entry.category),
         entry.amount.toFixed(2)
@@ -1377,6 +1568,217 @@
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     showToast(t("toastCsv"));
+  }
+
+  /* ---------- Interactive tutorial ---------- */
+  function tourSteps() {
+    return TOUR_STEPS[lang] || TOUR_STEPS.en;
+  }
+
+  function tourTargetFor(step) {
+    if (!step || !step.target) return null;
+    try {
+      return document.querySelector(step.target);
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function positionTour() {
+    if (el.tourOverlay.hidden) return;
+    const step = tourSteps()[tourIndex];
+    const target = tourTargetFor(step);
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const margin = 12;
+    const gap = 16;
+    const bubble = el.tourBubble;
+    const bRect = bubble.getBoundingClientRect();
+    const bw = bRect.width || Math.min(380, vw - 28);
+    const bh = bRect.height || 280;
+
+    if (!target) {
+      el.tourSpot.hidden = true;
+      el.tourOverlay.classList.add("final");
+      bubble.classList.remove("above", "below");
+      bubble.style.left = Math.max(margin, (vw - bw) / 2) + "px";
+      bubble.style.top = Math.max(margin, (vh - bh) / 2) + "px";
+      return;
+    }
+
+    el.tourOverlay.classList.remove("final");
+    el.tourSpot.hidden = false;
+    const rect = target.getBoundingClientRect();
+    const pad = 7;
+    const spotLeft = Math.max(6, rect.left - pad);
+    const spotTop = Math.max(6, rect.top - pad);
+    el.tourSpot.style.left = spotLeft + "px";
+    el.tourSpot.style.top = spotTop + "px";
+    el.tourSpot.style.width = Math.max(8, Math.min(vw - spotLeft - 6, rect.width + pad * 2)) + "px";
+    el.tourSpot.style.height = Math.max(8, Math.min(vh - spotTop - 6, rect.height + pad * 2)) + "px";
+
+    const roomBelow = vh - rect.bottom - gap - margin;
+    const roomAbove = rect.top - gap - margin;
+    const placeBelow = roomBelow >= bh || roomBelow >= roomAbove;
+    let top = placeBelow ? rect.bottom + gap : rect.top - bh - gap;
+    let left = rect.left + rect.width / 2 - bw / 2;
+    top = Math.max(margin, Math.min(vh - bh - margin, top));
+    left = Math.max(margin, Math.min(vw - bw - margin, left));
+    bubble.classList.toggle("below", placeBelow);
+    bubble.classList.toggle("above", !placeBelow);
+    bubble.style.left = left + "px";
+    bubble.style.top = top + "px";
+    const arrow = Math.max(22, Math.min(bw - 22, rect.left + rect.width / 2 - left));
+    bubble.style.setProperty("--arrow", arrow + "px");
+  }
+
+  function scrollTourTarget() {
+    const step = tourSteps()[tourIndex];
+    const target = tourTargetFor(step);
+    if (tourScrollTimer) {
+      clearTimeout(tourScrollTimer);
+      tourScrollTimer = null;
+    }
+    if (!target) {
+      positionTour();
+      return;
+    }
+    const rect = target.getBoundingClientRect();
+    const needsScroll = rect.top < 96 || rect.bottom > window.innerHeight - 96;
+    if (!needsScroll) {
+      document.body.classList.add("tour-open");
+      positionTour();
+      return;
+    }
+    document.body.classList.remove("tour-open");
+    target.scrollIntoView({ block: "center", inline: "nearest", behavior: REDUCED ? "auto" : "smooth" });
+    tourScrollTimer = setTimeout(() => {
+      document.body.classList.add("tour-open");
+      positionTour();
+      tourScrollTimer = null;
+    }, REDUCED ? 20 : 320);
+  }
+
+  function renderTourStep(shouldScroll) {
+    const steps = tourSteps();
+    tourIndex = Math.max(0, Math.min(tourIndex, steps.length - 1));
+    const step = steps[tourIndex];
+    el.tourIcon.textContent = step.icon;
+    el.tourTitle.textContent = step.title;
+    el.tourBody.textContent = step.body;
+    el.tourTip.textContent = step.tip || "";
+    el.tourStepLabel.textContent = t("tourStepCount", { n: tourIndex + 1, total: steps.length });
+    el.tourDots.replaceChildren(...steps.map((_, index) => {
+      const dot = document.createElement("span");
+      dot.className = "tour-dot" + (index === tourIndex ? " active" : "");
+      return dot;
+    }));
+    const backHadFocus = document.activeElement === el.tourBack;
+    el.tourBack.disabled = tourIndex === 0;
+    el.tourNext.textContent = tourIndex === steps.length - 1 ? t("tourFinish") : t("tourNext");
+    if (backHadFocus && el.tourBack.disabled) el.tourNext.focus({ preventScroll: true });
+    el.tourBubble.classList.remove("step-in");
+    void el.tourBubble.offsetWidth;
+    el.tourBubble.classList.add("step-in");
+    if (el.tourOverlay.hidden) return;
+    if (shouldScroll) scrollTourTarget();
+    else positionTour();
+  }
+
+  function openTour() {
+    if (!el.tourOverlay.hidden) return;
+    clearTimeout(tourCloseTimer);
+    tourCloseTimer = null;
+    tourReturnFocus = document.activeElement;
+    tourIndex = 0;
+    el.tourOverlay.hidden = false;
+    void el.tourOverlay.offsetWidth;
+    el.tourOverlay.classList.add("show");
+    document.body.classList.add("tour-open");
+    renderTourStep(true);
+    el.tourBubble.focus({ preventScroll: true });
+  }
+
+  function closeTour() {
+    if (el.tourOverlay.hidden) return;
+    clearTimeout(tourScrollTimer);
+    tourScrollTimer = null;
+    el.tourOverlay.classList.remove("show");
+    document.body.classList.remove("tour-open");
+    const returnFocus = tourReturnFocus;
+    tourReturnFocus = null;
+    const finish = () => {
+      el.tourOverlay.hidden = true;
+      el.tourOverlay.classList.remove("final");
+      el.tourSpot.hidden = true;
+      el.tourSpot.style.left = "";
+      el.tourSpot.style.top = "";
+      el.tourSpot.style.width = "";
+      el.tourSpot.style.height = "";
+      tourCloseTimer = null;
+      if (returnFocus && document.contains(returnFocus) && typeof returnFocus.focus === "function") {
+        returnFocus.focus({ preventScroll: true });
+      }
+    };
+    clearTimeout(tourCloseTimer);
+    if (REDUCED) finish();
+    else tourCloseTimer = setTimeout(finish, 200);
+  }
+
+  function goTourStep(delta) {
+    const target = Math.max(0, Math.min(tourSteps().length - 1, tourIndex + delta));
+    if (target === tourIndex) return;
+    tourIndex = target;
+    renderTourStep(true);
+  }
+
+  function nextTourStep() {
+    if (tourIndex >= tourSteps().length - 1) {
+      closeTour();
+      return;
+    }
+    goTourStep(1);
+  }
+
+  function tourFocusable() {
+    return Array.from(el.tourBubble.querySelectorAll("button:not([disabled])")).filter(node => !node.hidden);
+  }
+
+  function handleTourKeydown(ev) {
+    if (ev.key === "Escape") {
+      ev.preventDefault();
+      closeTour();
+      return;
+    }
+    if (ev.key === "ArrowRight") {
+      ev.preventDefault();
+      nextTourStep();
+      return;
+    }
+    if (ev.key === "ArrowLeft") {
+      ev.preventDefault();
+      goTourStep(-1);
+      return;
+    }
+    if (ev.key !== "Tab") return;
+    const items = tourFocusable();
+    if (!items.length) {
+      ev.preventDefault();
+      el.tourBubble.focus();
+      return;
+    }
+    const first = items[0];
+    const last = items[items.length - 1];
+    const active = document.activeElement;
+    if (ev.shiftKey) {
+      if (active === first || active === el.tourBubble || !el.tourBubble.contains(active)) {
+        ev.preventDefault();
+        last.focus();
+      }
+    } else if (active === last || active === el.tourBubble || !el.tourBubble.contains(active)) {
+      ev.preventDefault();
+      first.focus();
+    }
   }
 
   function applyLanguage() {
@@ -1400,9 +1802,25 @@
     updateLimitLabels();
     setFormMode(Boolean(editingId));
     el.formError.hidden = true;
+    renderTourStep(false);
   }
 
   /* ---------- Wiring ---------- */
+  el.tourBtn.addEventListener("click", openTour);
+  el.tourSkip.addEventListener("click", closeTour);
+  el.tourBack.addEventListener("click", () => goTourStep(-1));
+  el.tourNext.addEventListener("click", nextTourStep);
+  el.tourOverlay.addEventListener("keydown", handleTourKeydown);
+  el.tourOverlay.addEventListener("wheel", ev => {
+    if (!ev.target.closest(".tour-bubble")) ev.preventDefault();
+  }, { passive: false });
+  window.addEventListener("scroll", () => {
+    if (!el.tourOverlay.hidden) positionTour();
+  }, true);
+  window.addEventListener("resize", () => {
+    if (!el.tourOverlay.hidden) positionTour();
+  });
+
   el.prevMonth.addEventListener("click", () => shiftMonth(-1));
   el.nextMonth.addEventListener("click", () => shiftMonth(1));
   el.todayBtn.addEventListener("click", () => setView(new Date()));
