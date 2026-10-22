@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PocketWise — Finance, Made Student-Friendly</title>
+  <meta name="description" content="PocketWise helps college students spend with awareness, stay within budget, and build better money habits. A student-first finance dashboard.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #6C63FF;
+      --primary-light: #8B85FF;
+      --primary-dark: #4F46E5;
+      --accent: #FF6B6B;
+      --accent2: #FFA94D;
+      --accent3: #51CF66;
+      --accent4: #339AF0;
+      --bg: #FAFAFA;
+      --bg2: #F0F0F8;
+      --surface: #FFFFFF;
+      --surface2: #F7F7FC;
+      --text: #1A1A2E;
+      --text2: #4A4A6A;
+      --text3: #8888AA;
+      --border: #E8E8F0;
+      --shadow: 0 4px 24px rgba(108,99,255,0.08);
+      --shadow-lg: 0 16px 64px rgba(108,99,255,0.14);
+      --shadow-card: 0 2px 16px rgba(0,0,0,0.07);
+      --radius: 16px;
+      --radius-sm: 10px;
+      --radius-lg: 24px;
+      --radius-xl: 32px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+      line-height: 1.6;
+    }
+
+    /* NAV */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(255,255,255,0.88);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      transition: box-shadow 0.3s ease;
+    }
+    nav.scrolled { box-shadow: var(--shadow); }
+    .nav-inner {
+      max-width: 1200px; margin: 0 auto; padding: 0 32px;
+      height: 68px; display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-logo {
+      display: flex; align-items: center; gap: 10px;
+      font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 22px;
+      color: var(--text); text-decoration: none;
+    }
+    .nav-logo .logo-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      border-radius: 10px; display: flex; align-items: center; justify-content: center;
+      font-size: 18px; box-shadow: 0 4px 12px rgba(108,99,255,0.3);
+    }
+    .nav-links { display: flex; align-items: center; gap: 4px; list-style: none; }
+    .nav-links a {
+      padding: 8px 14px; border-radius: 8px; font-size: 14px; font-weight: 500;
+      color: var(--text2); text-decoration: none; transition: all 0.2s ease;
+    }
+    .nav-links a:hover { color: var(--primary); background: rgba(108,99,255,0.06); }
+    .nav-cta {
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark)) !important;
+      color: white !important; padding: 10px 20px !important; border-radius: 10px !important;
+      box-shadow: 0 4px 14px rgba(108,99,255,0.3); font-size: 14px !important;
+    }
+    .nav-cta:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(108,99,255,0.4) !important; }
+
+    /* HACKATHON BANNER */
+    .hackathon-banner {
+      background: linear-gradient(135deg, #6C63FF, #FF6B6B);
+      text-align: center; padding: 11px 32px;
+      font-size: 14px; font-weight: 600; color: white; letter-spacing: 0.2px;
+    }
+
+    /* HERO */
+    .hero {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      position: relative; overflow: hidden; padding: 130px 32px 80px;
+      background: linear-gradient(155deg, #FFFFFF 0%, #F5F3FF 45%, #EDE9FF 100%);
+    }
+    .blob {
+      position: absolute; border-radius: 50%; filter: blur(80px);
+      opacity: 0.45; pointer-events: none;
+      animation: blobFloat 9s ease-in-out infinite;
+    }
+    .blob-1 { width: 520px; height: 520px; background: radial-gradient(circle, rgba(108,99,255,0.35), transparent 70%); top: -120px; right: -80px; }
+    .blob-2 { width: 380px; height: 380px; background: radial-gradient(circle, rgba(255,107,107,0.25), transparent 70%); bottom: -60px; left: -60px; animation-delay: -4.5s; }
+    .blob-3 { width: 280px; height: 280px; background: radial-gradient(circle, rgba(81,207,102,0.2), transparent 70%); top: 45%; left: 25%; animation-delay: -2s; }
+    @keyframes blobFloat {
+      0%,100% { transform: translate(0,0) scale(1); }
+      33% { transform: translate(18px,-18px) scale(1.05); }
+      66% { transform: translate(-12px,14px) scale(0.96); }
+    }
+    .hero-content { max-width: 760px; text-align: center; position: relative; z-index: 2; margin: 0 auto 56px; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: white; border: 1px solid var(--border); border-radius: 100px;
+      padding: 8px 18px; font-size: 13px; font-weight: 600; color: var(--primary);
+      margin-bottom: 28px; box-shadow: var(--shadow-card);
+      animation: fadeInDown 0.6s ease both;
+    }
+    .badge .dot {
+      width: 7px; height: 7px; background: #51CF66; border-radius: 50%;
+      animation: pulse 2s ease infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:0.5;transform:scale(1.4);} }
+    .hero h1 {
+      font-family: 'Outfit', sans-serif; font-size: clamp(46px, 8vw, 74px);
+      font-weight: 800; line-height: 1.09; color: var(--text); margin-bottom: 22px;
+      animation: fadeInUp 0.6s ease 0.1s both;
+    }
+    .grad { background: linear-gradient(135deg, var(--primary), #FF6B6B); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .hero p { font-size: 19px; color: var(--text2); max-width: 550px; margin: 0 auto 40px; line-height: 1.75; animation: fadeInUp 0.6s ease 0.2s both; }
+    .hero-btns { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; animation: fadeInUp 0.6s ease 0.3s both; margin-bottom: 64px; }
+    @keyframes fadeInUp { from{opacity:0;transform:translateY(24px);} to{opacity:1;transform:translateY(0);} }
+    @keyframes fadeInDown { from{opacity:0;transform:translateY(-12px);} to{opacity:1;transform:translateY(0);} }
+    .btn-primary {
+      padding: 15px 34px; background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: white; border: none; border-radius: var(--radius); font-size: 16px; font-weight: 600;
+      cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;
+      box-shadow: 0 8px 28px rgba(108,99,255,0.32); transition: transform 0.2s ease, box-shadow 0.2s ease;
+      font-family: 'Inter', sans-serif;
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 36px rgba(108,99,255,0.42); }
+    .btn-secondary {
+      padding: 15px 34px; background: white; color: var(--text);
+      border: 1.5px solid var(--border); border-radius: var(--radius); font-size: 16px; font-weight: 600;
+      cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;
+      transition: all 0.2s ease; font-family: 'Inter', sans-serif;
+    }
+    .btn-secondary:hover { border-color: var(--primary); color: var(--primary); transform: translateY(-2px); box-shadow: var(--shadow); }
+
+    /* MOCKUP */
+    .hero-mockup { max-width: 820px; margin: 0 auto; animation: fadeInUp 0.8s ease 0.45s both; position: relative; z-index: 2; }
+    .mockup-win { background: white; border-radius: 20px; box-shadow: 0 32px 100px rgba(108,99,255,0.18), 0 8px 32px rgba(0,0,0,0.09); overflow: hidden; border: 1px solid var(--border); }
+    .mockup-bar { height: 44px; background: var(--surface2); display: flex; align-items: center; padding: 0 16px; gap: 8px; border-bottom: 1px solid var(--border); }
+    .mdot { width: 12px; height: 12px; border-radius: 50%; }
+    .mdot.r{background:#FF5F57;} .mdot.y{background:#FFBD2E;} .mdot.g{background:#28C840;}
+    .murl { flex: 1; background: var(--bg); border-radius: 6px; height: 26px; display: flex; align-items: center; padding: 0 12px; font-size: 12px; color: var(--text3); margin: 0 12px; }
+    .mockup-body { padding: 28px; }
+    .dash-cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+    .dcard { border-radius: 12px; padding: 18px; color: white; }
+    .dcard.purple{background:linear-gradient(135deg,var(--primary),var(--primary-dark));}
+    .dcard.orange{background:linear-gradient(135deg,#FFA94D,#E67700);}
+    .dcard.green{background:linear-gradient(135deg,#51CF66,#2F9E44);}
+    .dcard-lbl{font-size:11px;font-weight:600;opacity:0.78;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;}
+    .dcard-val{font-family:'Outfit',sans-serif;font-size:26px;font-weight:700;}
+    .dcard-sub{font-size:11px;opacity:0.68;margin-top:3px;}
+    .prog-wrap{background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:12px;}
+    .prog-top{display:flex;justify-content:space-between;font-size:13px;font-weight:500;margin-bottom:8px;}
+    .prog-bar{height:7px;background:var(--border);border-radius:100px;overflow:hidden;}
+    .prog-fill{height:100%;border-radius:100px;background:linear-gradient(90deg,var(--primary),var(--primary-light));transition:width 1.2s ease;}
+    .prog-fill.g{background:linear-gradient(90deg,#51CF66,#20C997);}
+
+    /* SECTION BASE */
+    section { padding: 96px 32px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .sec-lbl {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 12px; font-weight: 700; color: var(--primary);
+      text-transform: uppercase; letter-spacing: 1px; margin-bottom: 14px;
+    }
+    .sec-lbl::before { content:''; width:20px; height:2px; background:var(--primary); border-radius:2px; }
+    .sec-title { font-family:'Outfit',sans-serif; font-size:clamp(30px,5vw,46px); font-weight:700; line-height:1.2; color:var(--text); margin-bottom:14px; }
+    .sec-sub { font-size:17px; color:var(--text2); line-height:1.72; max-width:540px; }
+    .sec-hdr { margin-bottom: 60px; }
+    .sec-hdr.center { text-align:center; }
+    .sec-hdr.center .sec-lbl { justify-content:center; }
+    .sec-hdr.center .sec-sub { margin:0 auto; }
+
+    /* STATS */
+    .stats-bar { background: white; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 56px 32px; }
+    .stats-grid { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(4,1fr); }
+    .stat-item { text-align: center; padding: 0 24px; border-right: 1px solid var(--border); }
+    .stat-item:last-child { border-right: none; }
+    .stat-num { font-family: 'Outfit', sans-serif; font-size: 50px; font-weight: 800; color: var(--primary); line-height: 1; margin-bottom: 8px; }
+    .stat-lbl { font-size: 15px; color: var(--text2); font-weight: 500; }
+
+    /* PROBLEM */
+    .problem-sec { background: var(--surface2); }
+    .prob-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .prob-card {
+      background: white; border-radius: var(--radius); padding: 28px; border: 1px solid var(--border);
+      display: flex; gap: 18px; align-items: flex-start; transition: all 0.3s ease;
+      position: relative; overflow: hidden;
+    }
+    .prob-card::before { content:''; position:absolute; top:0;left:0; width:4px; height:100%; background:var(--accent); opacity:0; transition:opacity 0.3s; }
+    .prob-card:hover { transform:translateY(-4px); box-shadow:var(--shadow-lg); }
+    .prob-card:hover::before { opacity:1; }
+    .prob-num {
+      width:42px; height:42px; background:rgba(108,99,255,0.09); color:var(--primary);
+      font-weight:800; font-family:'Outfit',sans-serif; font-size:17px; border-radius:12px;
+      display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    }
+    .prob-emoji { font-size:34px; flex-shrink:0; }
+    .prob-card h3 { font-size:17px; font-weight:700; margin-bottom:7px; color:var(--text); }
+    .prob-card p { font-size:14px; color:var(--text2); line-height:1.62; }
+
+    /* SOLUTION */
+    .sol-sec { background: white; }
+    .sol-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 20px; }
+    .sol-card {
+      background: var(--surface2); border-radius: var(--radius); padding: 32px 26px;
+      border: 1px solid var(--border); text-align: center; transition: all 0.3s ease; position: relative; overflow: hidden;
+    }
+    .sol-card:hover { transform:translateY(-6px); box-shadow:var(--shadow-lg); border-color:var(--primary); }
+    .sol-card:hover .sol-icon { transform:scale(1.12) rotate(4deg); }
+    .sol-icon { width:60px; height:60px; border-radius:16px; margin:0 auto 18px; display:flex; align-items:center; justify-content:center; font-size:28px; transition:transform 0.3s; }
+    .ip{background:rgba(108,99,255,0.1);} .ir{background:rgba(255,107,107,0.1);}
+    .ig{background:rgba(81,207,102,0.1);} .ib{background:rgba(51,154,240,0.1);}
+    .io{background:rgba(255,169,77,0.1);} .it{background:rgba(32,201,151,0.1);}
+    .sol-step { font-size:11px; font-weight:700; color:var(--primary); text-transform:uppercase; letter-spacing:1px; margin-bottom:10px; }
+    .sol-card h3 { font-size:18px; font-weight:700; margin-bottom:8px; }
+    .sol-card p { font-size:13.5px; color:var(--text2); line-height:1.62; }
+
+    /* HOW IT WORKS */
+    .how-sec { background: var(--surface2); }
+    .steps { display:grid; grid-template-columns:repeat(4,1fr); gap:0; position:relative; }
+    .steps::before { content:''; position:absolute; top:44px; left:12%; right:12%; height:2px; background:linear-gradient(90deg,var(--primary),var(--primary-light)); z-index:0; }
+    .step { text-align:center; padding:0 14px; position:relative; z-index:1; }
+    .step-circle {
+      width:88px; height:88px; background:white; border:3px solid var(--primary); border-radius:50%;
+      display:flex; align-items:center; justify-content:center; margin:0 auto 22px; font-size:30px;
+      box-shadow:0 4px 16px rgba(108,99,255,0.2); transition:all 0.3s ease; position:relative;
+    }
+    .step:hover .step-circle { background:var(--primary); transform:scale(1.08); box-shadow:0 8px 24px rgba(108,99,255,0.4); filter:hue-rotate(0deg); }
+    .step-n {
+      position:absolute; top:-6px; right:calc(50% - 52px); width:22px; height:22px;
+      background:var(--primary); color:white; border-radius:50%; font-size:11px; font-weight:700;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .step h3 { font-size:17px; font-weight:700; margin-bottom:8px; }
+    .step p { font-size:13.5px; color:var(--text2); line-height:1.6; }
+
+    /* IMPACT */
+    .impact-sec { background:white; }
+    .impact-grid { display:grid; grid-template-columns:1fr 1fr; gap:48px; align-items:center; }
+    .impact-list { display:flex; flex-direction:column; gap:18px; }
+    .impact-item {
+      display:flex; align-items:flex-start; gap:16px; padding:22px;
+      background:var(--surface2); border-radius:var(--radius); border:1px solid var(--border); transition:all 0.3s;
+    }
+    .impact-item:hover { transform:translateX(6px); border-color:var(--primary); box-shadow:var(--shadow); }
+    .icheck { width:34px;height:34px;background:linear-gradient(135deg,#51CF66,#20C997);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0; }
+    .impact-item h3 { font-size:15px; font-weight:700; margin-bottom:4px; }
+    .impact-item p { font-size:13.5px; color:var(--text2); line-height:1.55; }
+    .impact-visual {
+      background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+      border-radius:var(--radius-xl); padding:40px; color:white; position:relative; overflow:hidden;
+    }
+    .impact-visual::before { content:''; position:absolute; width:220px;height:220px; background:rgba(255,255,255,0.05); border-radius:50%; top:-70px;right:-70px; }
+    .impact-visual::after { content:''; position:absolute; width:160px;height:160px; background:rgba(255,255,255,0.05); border-radius:50%; bottom:-50px;left:-50px; }
+    .iv-title { font-family:'Outfit',sans-serif; font-size:26px; font-weight:700; margin-bottom:28px; position:relative;z-index:1; }
+    .iv-metrics { display:flex;flex-direction:column;gap:18px;position:relative;z-index:1; }
+    .iv-row-top { display:flex; justify-content:space-between; font-size:14px; opacity:0.9; margin-bottom:7px; }
+    .iv-bar { height:8px; background:rgba(255,255,255,0.2); border-radius:100px; overflow:hidden; }
+    .iv-fill { height:100%; background:rgba(255,255,255,0.82); border-radius:100px; }
+    .iv-note { margin-top:24px; padding-top:18px; border-top:1px solid rgba(255,255,255,0.18); font-size:13px; opacity:0.72; position:relative;z-index:1; }
+
+    /* PRINCIPLES */
+    .prin-sec { background:var(--surface2); }
+    .prin-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+    .prin-card {
+      background:white; border-radius:var(--radius); padding:28px;
+      display:flex; align-items:flex-start; gap:18px; border:1px solid var(--border); transition:all 0.3s;
+    }
+    .prin-card:hover { transform:translateY(-3px); box-shadow:var(--shadow); border-color:var(--primary); }
+    .prin-icon { width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0; }
+    .prin-card h3 { font-size:16px; font-weight:700; margin-bottom:6px; }
+    .prin-card p { font-size:13.5px; color:var(--text2); line-height:1.6; }
+
+    /* DEMO */
+    .demo-sec { background:white; }
+    .demo-wrap {
+      background:linear-gradient(135deg,#F8F7FF,#EDE9FF);
+      border-radius:var(--radius-xl); padding:44px; border:1px solid var(--border);
+    }
+    .demo-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:28px; flex-wrap:wrap; gap:16px; }
+    .demo-greeting { font-family:'Outfit',sans-serif; font-size:22px; font-weight:700; }
+    .demo-greeting span { color:var(--primary); }
+    .nudge {
+      background:linear-gradient(135deg,#FFF7ED,#FFEDD5); border:1px solid #FED7AA;
+      border-radius:var(--radius-sm); padding:12px 18px; display:flex; align-items:center; gap:10px;
+      font-size:13.5px; font-weight:500; color:#92400E; max-width:340px;
+    }
+    .demo-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:24px; }
+    .ds-card { background:white; border-radius:var(--radius-sm); padding:18px; text-align:center; box-shadow:var(--shadow-card); }
+    .ds-lbl { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--text3); margin-bottom:7px; }
+    .ds-val { font-family:'Outfit',sans-serif; font-size:27px; font-weight:700; }
+    .ds-val.p{color:var(--primary);} .ds-val.r{color:var(--accent);} .ds-val.g{color:var(--accent3);}
+    .add-form { background:white; border-radius:var(--radius-sm); padding:22px; box-shadow:var(--shadow-card); margin-bottom:18px; }
+    .add-form-lbl { font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--text2); margin-bottom:14px; }
+    .form-row { display:flex; gap:10px; flex-wrap:wrap; }
+    .form-row select, .form-row input {
+      padding:11px 14px; border:1.5px solid var(--border); border-radius:10px;
+      font-family:'Inter',sans-serif; font-size:14px; color:var(--text); background:var(--surface2); outline:none;
+      transition:border-color 0.2s;
+    }
+    .form-row select:focus, .form-row input:focus { border-color:var(--primary); }
+    .form-row select { flex:1;min-width:130px;cursor:pointer; }
+    .form-row .fi { flex:2; min-width:150px; }
+    .form-row .fa { flex:1; min-width:100px; }
+    .add-btn {
+      padding:11px 22px; background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+      color:white; border:none; border-radius:10px; font-size:14px; font-weight:600;
+      cursor:pointer; white-space:nowrap; font-family:'Inter',sans-serif; transition:transform 0.2s;
+    }
+    .add-btn:hover { transform:translateY(-1px); }
+    .cat-budgets { background:white; border-radius:var(--radius-sm); padding:22px; box-shadow:var(--shadow-card); margin-bottom:16px; }
+    .cb-title { font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--text2); margin-bottom:14px; }
+    .cb-row { margin-bottom:12px; }
+    .cb-row:last-child { margin-bottom:0; }
+    .cb-top { display:flex; justify-content:space-between; font-size:13.5px; margin-bottom:5px; font-weight:500; }
+    .cb-top .used { color:var(--text3); font-weight:400; }
+    .savings-banner {
+      background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+      border-radius:var(--radius-sm); padding:22px; color:white;
+      display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;
+    }
+    .sb-label { font-size:12px; opacity:0.78; margin-bottom:3px; }
+    .sb-goal { font-size:19px; font-weight:700; }
+    .sb-pct { font-family:'Outfit',sans-serif; font-size:38px; font-weight:800; }
+    .sb-pct-lbl { font-size:12px; opacity:0.72; text-align:right; }
+    .sb-bar { height:6px; background:rgba(255,255,255,0.22); border-radius:100px; overflow:hidden; margin-top:10px; width:200px; }
+    .sb-fill { height:100%; background:rgba(255,255,255,0.82); border-radius:100px; transition:width 0.5s; }
+    .txn-section { background:white; border-radius:var(--radius-sm); padding:20px; box-shadow:var(--shadow-card); }
+    .txn-title { font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--text2); margin-bottom:12px; }
+    .txn-list { display:flex; flex-direction:column; gap:8px; }
+    .txn-row { display:flex; align-items:center; justify-content:space-between; padding:10px 12px; background:var(--surface2); border-radius:9px; }
+    .txn-l { display:flex; align-items:center; gap:10px; }
+    .txn-ico { width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px; }
+    .txn-ico.food{background:rgba(255,107,107,0.12);}
+    .txn-ico.transport{background:rgba(51,154,240,0.12);}
+    .txn-ico.shopping{background:rgba(108,99,255,0.12);}
+    .txn-ico.entertainment{background:rgba(255,169,77,0.12);}
+    .txn-ico.health{background:rgba(81,207,102,0.12);}
+    .txn-ico.other{background:rgba(136,136,170,0.12);}
+    .txn-name { font-size:13.5px; font-weight:500; }
+    .txn-date { font-size:11px; color:var(--text3); }
+    .txn-amt { font-size:13.5px; font-weight:600; color:var(--accent); }
+
+    /* CTA */
+    .cta-sec {
+      background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+      padding:110px 32px; text-align:center; position:relative; overflow:hidden;
+    }
+    .cta-sec::before{content:'';position:absolute;width:600px;height:600px;background:rgba(255,255,255,0.04);border-radius:50%;top:-200px;right:-100px;}
+    .cta-sec::after{content:'';position:absolute;width:400px;height:400px;background:rgba(255,255,255,0.04);border-radius:50%;bottom:-160px;left:-80px;}
+    .cta-sec h2 { font-family:'Outfit',sans-serif;font-size:clamp(34px,6vw,54px);font-weight:800;color:white;margin-bottom:18px;position:relative;z-index:1; }
+    .cta-sec p { font-size:19px;color:rgba(255,255,255,0.75);margin-bottom:40px;position:relative;z-index:1; }
+    .cta-tags { display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:44px;position:relative;z-index:1; }
+    .cta-tag { background:rgba(255,255,255,0.14);color:white;padding:8px 18px;border-radius:100px;font-size:14px;font-weight:600; }
+    .cta-btns { display:flex;gap:14px;justify-content:center;flex-wrap:wrap;position:relative;z-index:1; }
+    .btn-white { padding:15px 38px;background:white;color:var(--primary);border:none;border-radius:var(--radius);font-size:16px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:8px;box-shadow:0 8px 28px rgba(0,0,0,0.18);transition:transform 0.2s,box-shadow 0.2s;font-family:'Inter',sans-serif; }
+    .btn-white:hover{transform:translateY(-2px);box-shadow:0 12px 36px rgba(0,0,0,0.24);}
+    .btn-ghost{padding:15px 38px;background:rgba(255,255,255,0.1);color:white;border:1.5px solid rgba(255,255,255,0.38);border-radius:var(--radius);font-size:16px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:8px;transition:all 0.2s;font-family:'Inter',sans-serif;}
+    .btn-ghost:hover{background:rgba(255,255,255,0.18);transform:translateY(-2px);}
+
+    /* FOOTER */
+    footer{background:var(--text);padding:44px 32px;color:rgba(255,255,255,0.45);text-align:center;}
+    .ft-inner{max-width:1200px;margin:0 auto;}
+    .ft-logo{font-family:'Outfit',sans-serif;font-size:22px;font-weight:700;color:white;margin-bottom:7px;}
+    .ft-tag{font-size:14px;margin-bottom:24px;}
+    .ft-links{display:flex;gap:22px;justify-content:center;flex-wrap:wrap;margin-bottom:28px;}
+    .ft-links a{color:rgba(255,255,255,0.45);text-decoration:none;font-size:14px;transition:color 0.2s;}
+    .ft-links a:hover{color:white;}
+    .ft-div{height:1px;background:rgba(255,255,255,0.1);margin:0 0 22px;}
+    .ft-copy{font-size:13px;}
+
+    /* REVEAL ANIMATION */
+    .reveal{opacity:0;transform:translateY(28px);transition:opacity 0.6s ease,transform 0.6s ease;}
+    .reveal.visible{opacity:1;transform:translateY(0);}
+    .d1{transition-delay:0.1s;} .d2{transition-delay:0.2s;} .d3{transition-delay:0.3s;} .d4{transition-delay:0.4s;}
+
+    /* RESPONSIVE */
+    @media(max-width:900px){
+      .stats-grid{grid-template-columns:1fr 1fr;}
+      .stat-item{border-right:none;padding:16px 0;border-bottom:1px solid var(--border);}
+      .stat-item:nth-child(even):last-child,.stat-item:last-child{border-bottom:none;}
+      .prob-grid,.prin-grid{grid-template-columns:1fr;}
+      .sol-grid{grid-template-columns:1fr 1fr;}
+      .steps{grid-template-columns:1fr 1fr;}
+      .steps::before{display:none;}
+      .impact-grid{grid-template-columns:1fr;}
+      .demo-stats{grid-template-columns:1fr;}
+      .dash-cards{grid-template-columns:1fr 1fr;}
+      nav ul{display:none;}
+    }
+    @media(max-width:600px){
+      section{padding:60px 18px;}
+      .stats-bar{padding:36px 18px;}
+      .sol-grid,.steps{grid-template-columns:1fr;}
+      .hero-btns,.cta-btns{flex-direction:column;align-items:center;}
+      .demo-wrap{padding:24px 18px;}
+      .dash-cards{grid-template-columns:1fr;}
+      .savings-banner{flex-direction:column;gap:16px;text-align:center;}
+      .sb-bar{margin:8px auto 0;}
+    }
+  </style>
+</head>
+<body>
+
+<!-- Banner -->
+<div class="hackathon-banner">
+  🏆 <strong>Hackathon Project 2024</strong> &nbsp;—&nbsp; Student Finance Innovation Challenge &nbsp;🚀
+</div>
+
+<!-- Nav -->
+<nav id="nav">
+  <div class="nav-inner">
+    <a href="#" class="nav-logo">
+      <div class="logo-icon">💸</div>
+      PocketWise
+    </a>
+    <ul class="nav-links">
+      <li><a href="#problem">Problem</a></li>
+      <li><a href="#solution">Solution</a></li>
+      <li><a href="#how">How It Works</a></li>
+      <li><a href="#impact">Impact</a></li>
+      <li><a href="#principles">Design</a></li>
+      <li><a href="#demo" class="nav-cta">✨ Live Demo</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero" id="hero">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+  <div style="width:100%;max-width:1100px;margin:0 auto;position:relative;z-index:2;">
+    <div class="hero-content">
+      <div class="badge"><div class="dot"></div> Student-First Finance Platform</div>
+      <h1>Finance, Made<br><span class="grad">Student-Friendly.</span></h1>
+      <p>PocketWise helps college students spend with awareness, stay within budget, and build better money habits — one simple dashboard at a time.</p>
+      <div class="hero-btns">
+        <a href="#demo" class="btn-primary">✨ Try the Dashboard</a>
+        <a href="#solution" class="btn-secondary">📖 See How It Works</a>
+      </div>
+    </div>
+    <!-- Mockup -->
+    <div class="hero-mockup">
+      <div class="mockup-win">
+        <div class="mockup-bar">
+          <div class="mdot r"></div><div class="mdot y"></div><div class="mdot g"></div>
+          <div class="murl">🔒 pocketwise.app/dashboard</div>
+        </div>
+        <div class="mockup-body">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+            <div>
+              <div style="font-size:12px;color:var(--text3);margin-bottom:3px;">Good afternoon 👋</div>
+              <div style="font-family:'Outfit',sans-serif;font-size:19px;font-weight:700;">Here's your October snapshot</div>
+            </div>
+            <div style="background:rgba(81,207,102,0.12);color:#2F9E44;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:600;">On Track ✓</div>
+          </div>
+          <div class="dash-cards">
+            <div class="dcard purple"><div class="dcard-lbl">Monthly Budget</div><div class="dcard-val">₹10,000</div><div class="dcard-sub">Set for October</div></div>
+            <div class="dcard orange"><div class="dcard-lbl">Spent So Far</div><div class="dcard-val">₹6,450</div><div class="dcard-sub">64.5% used</div></div>
+            <div class="dcard green"><div class="dcard-lbl">Left to Spend</div><div class="dcard-val">₹3,550</div><div class="dcard-sub">Across 9 days</div></div>
+          </div>
+          <div class="prog-wrap">
+            <div class="prog-top"><span>🍔 Food & Cafés</span><span>₹1,900 / ₹2,500</span></div>
+            <div class="prog-bar"><div class="prog-fill" style="width:76%"></div></div>
+          </div>
+          <div class="prog-wrap" style="margin-bottom:0;">
+            <div class="prog-top"><span>🏖️ Trip Fund Savings</span><span>67% saved</span></div>
+            <div class="prog-bar"><div class="prog-fill g" style="width:67%"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Stats -->
+<div class="stats-bar">
+  <div class="stats-grid">
+    <div class="stat-item reveal"><div class="stat-num">73%</div><div class="stat-lbl">Students overspend monthly</div></div>
+    <div class="stat-item reveal d1"><div class="stat-num">4</div><div class="stat-lbl">Steps to better habits</div></div>
+    <div class="stat-item reveal d2"><div class="stat-num">₹0</div><div class="stat-lbl">Cost to start using PocketWise</div></div>
+    <div class="stat-item reveal d3"><div class="stat-num">10s</div><div class="stat-lbl">To log an expense</div></div>
+  </div>
+</div>
+
+<!-- Problem -->
+<section class="problem-sec" id="problem">
+  <div class="container">
+    <div class="sec-hdr">
+      <div class="sec-lbl">The Problem</div>
+      <h2 class="sec-title">Student money disappears<br>in small moments</h2>
+      <p class="sec-sub">Many students manage money for the first time when college brings new freedom and new expenses — without the tools to handle it responsibly.</p>
+    </div>
+    <div class="prob-grid">
+      <div class="prob-card reveal">
+        <div class="prob-num">01</div>
+        <div class="prob-emoji">☕</div>
+        <div><h3>Impulse Spending</h3><p>Snacks, cafés, and quick online purchases add up quietly. Before you know it, the budget is gone.</p></div>
+      </div>
+      <div class="prob-card reveal d1">
+        <div class="prob-num">02</div>
+        <div class="prob-emoji">📊</div>
+        <div><h3>No Clear Budget</h3><p>Students may know their balance, but not what is actually safe to spend today or this week.</p></div>
+      </div>
+      <div class="prob-card reveal d2">
+        <div class="prob-num">03</div>
+        <div class="prob-emoji">😱</div>
+        <div><h3>Unplanned Costs</h3><p>Travel, printing, subscriptions, and project costs can surprise students when they least expect it.</p></div>
+      </div>
+      <div class="prob-card reveal d3">
+        <div class="prob-num">04</div>
+        <div class="prob-emoji">🎯</div>
+        <div><h3>Saving Feels Difficult</h3><p>A savings goal feels far away when spending isn't tracked. Goals keep getting pushed to next month.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Solution -->
+<section class="sol-sec" id="solution">
+  <div class="container">
+    <div class="sec-hdr center">
+      <div class="sec-lbl">Our Solution</div>
+      <h2 class="sec-title">One simple place to plan,<br>track, and improve</h2>
+      <p class="sec-sub">A student-first finance dashboard turns money management into a short, repeatable daily habit.</p>
+    </div>
+    <div class="sol-grid">
+      <div class="sol-card reveal"><div class="sol-icon ip">💰</div><div class="sol-step">Step 01</div><h3>Set a Monthly Budget</h3><p>Enter expected income and divide it into spending categories that match your lifestyle.</p></div>
+      <div class="sol-card reveal d1"><div class="sol-icon ir">⚡</div><div class="sol-step">Step 02</div><h3>Track Expenses Quickly</h3><p>Log purchases in seconds and tag each one by category. No spreadsheets, no friction.</p></div>
+      <div class="sol-card reveal d2"><div class="sol-icon ig">📈</div><div class="sol-step">Step 03</div><h3>See What's Left</h3><p>A live dashboard shows budget used and remaining money at a glance — always up to date.</p></div>
+      <div class="sol-card reveal d3"><div class="sol-icon io">🏆</div><div class="sol-step">Step 04</div><h3>Save Toward a Goal</h3><p>Set a target amount and track progress in small, satisfying steps. Watch it grow.</p></div>
+      <div class="sol-card reveal d1"><div class="sol-icon ib">🔔</div><div class="sol-step">Step 05</div><h3>Get Gentle Alerts</h3><p>Receive a supportive nudge when a category is close to its limit — not a shame spiral.</p></div>
+      <div class="sol-card reveal d2"><div class="sol-icon it">🔍</div><div class="sol-step">Step 06</div><h3>Review Your Habits</h3><p>A monthly summary highlights spending patterns without judgement, so you can improve next month.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- How It Works -->
+<section class="how-sec" id="how">
+  <div class="container">
+    <div class="sec-hdr center">
+      <div class="sec-lbl">How It Works</div>
+      <h2 class="sec-title">A simple 4-step journey</h2>
+      <p class="sec-sub">Designed to fit into a student's routine — no complicated spreadsheets required.</p>
+    </div>
+    <div class="steps">
+      <div class="step reveal">
+        <div class="step-circle"><span>🚀</span><div class="step-n">1</div></div>
+        <h3>Start</h3>
+        <p>Enter your monthly allowance, income, and fixed expenses to get your baseline.</p>
+      </div>
+      <div class="step reveal d1">
+        <div class="step-circle"><span>📋</span><div class="step-n">2</div></div>
+        <h3>Plan</h3>
+        <p>Set category limits for food, travel, shopping, and more that feel realistic for you.</p>
+      </div>
+      <div class="step reveal d2">
+        <div class="step-circle"><span>📝</span><div class="step-n">3</div></div>
+        <h3>Track</h3>
+        <p>Add an expense whenever you spend — the dashboard updates instantly in real time.</p>
+      </div>
+      <div class="step reveal d3">
+        <div class="step-circle"><span>💡</span><div class="step-n">4</div></div>
+        <h3>Improve</h3>
+        <p>Use alerts and monthly summaries to make smarter decisions next month.</p>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:52px;" class="reveal">
+      <div style="display:inline-block;padding:20px 36px;background:white;border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow-card);">
+        <div style="font-size:11px;color:var(--primary);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Design Principle</div>
+        <div style="font-size:17px;font-weight:600;color:var(--text);font-style:italic;">"Make the next good money decision obvious — not overwhelming."</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Impact -->
+<section class="impact-sec" id="impact">
+  <div class="container">
+    <div class="sec-hdr">
+      <div class="sec-lbl">Expected Impact</div>
+      <h2 class="sec-title">How we'll know<br>it's helping</h2>
+      <p class="sec-sub">Proposed success measures focused on real behaviour change — not vanity metrics.</p>
+    </div>
+    <div class="impact-grid">
+      <div class="impact-list">
+        <div class="impact-item reveal"><div class="icheck">✅</div><div><h3>More Awareness</h3><p>Students can identify their top spending categories and understand where money actually goes.</p></div></div>
+        <div class="impact-item reveal d1"><div class="icheck">✅</div><div><h3>Fewer Surprises</h3><p>Users check remaining budget before month-end, not discover they're broke on the 25th.</p></div></div>
+        <div class="impact-item reveal d2"><div class="icheck">✅</div><div><h3>Goal Progress</h3><p>More users create and regularly update a savings goal — and actually make progress towards it.</p></div></div>
+        <div class="impact-item reveal d3"><div class="icheck">✅</div><div><h3>Easy to Use</h3><p>Expense entry is quick and the dashboard feels immediately clear — zero learning curve required.</p></div></div>
+      </div>
+      <div class="impact-visual reveal d2">
+        <div class="iv-title">📊 Proposed Success Metrics</div>
+        <div class="iv-metrics">
+          <div class="iv-row">
+            <div class="iv-row-top"><span>Category Awareness</span><span>85%</span></div>
+            <div class="iv-bar"><div class="iv-fill" style="width:85%"></div></div>
+          </div>
+          <div class="iv-row">
+            <div class="iv-row-top"><span>Budget Check Rate</span><span>70%</span></div>
+            <div class="iv-bar"><div class="iv-fill" style="width:70%"></div></div>
+          </div>
+          <div class="iv-row">
+            <div class="iv-row-top"><span>Savings Goal Created</span><span>60%</span></div>
+            <div class="iv-bar"><div class="iv-fill" style="width:60%"></div></div>
+          </div>
+          <div class="iv-row">
+            <div class="iv-row-top"><span>Ease of Use Score</span><span>92%</span></div>
+            <div class="iv-bar"><div class="iv-fill" style="width:92%"></div></div>
+          </div>
+          <div class="iv-note">📋 Next: Test with 5–10 students and gather feedback on what felt useful or confusing.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Principles -->
+<section class="prin-sec" id="principles">
+  <div class="container">
+    <div class="sec-hdr center">
+      <div class="sec-lbl">Responsible Design</div>
+      <h2 class="sec-title">Money tools should feel safe,<br>private, and non-judgmental</h2>
+      <p class="sec-sub">Trust is part of the product — especially when people are entering personal financial information.</p>
+    </div>
+    <div class="prin-grid">
+      <div class="prin-card reveal"><div class="prin-icon ip">🔒</div><div><h3>Privacy First</h3><p>We only collect what the prototype needs and explain how it's used. No tracking, no selling, no surprises.</p></div></div>
+      <div class="prin-card reveal d1"><div class="prin-icon ig">🎛️</div><div><h3>User Control</h3><p>Students can edit or delete their entries and budgets at any time. Full ownership of their own data.</p></div></div>
+      <div class="prin-card reveal d2"><div class="prin-icon io">💬</div><div><h3>No Shame Language</h3><p>We use supportive, encouraging reminders rather than guilt or blame. Progress over perfection, always.</p></div></div>
+      <div class="prin-card reveal d3"><div class="prin-icon ib">🎯</div><div><h3>Clear Boundaries</h3><p>We show spending insights, not risky promises or guaranteed outcomes. Honest, transparent, clear.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- Live Demo -->
+<section class="demo-sec" id="demo">
+  <div class="container">
+    <div class="sec-hdr center">
+      <div class="sec-lbl">Live Demo</div>
+      <h2 class="sec-title">A dashboard students<br>understand at a glance</h2>
+      <p class="sec-sub">Interactive prototype — add your own expenses and see the dashboard update in real time.</p>
+    </div>
+    <div class="demo-wrap">
+      <div class="demo-hdr">
+        <div>
+          <div style="font-size:13px;color:var(--text3);margin-bottom:3px;">Good afternoon 👋</div>
+          <div class="demo-greeting">Here's your <span id="demoMonth">October</span> snapshot</div>
+        </div>
+        <div class="nudge" id="nudgeCard">💡 You're on track. Keep ₹500 aside for your savings goal.</div>
+      </div>
+      <div class="demo-stats">
+        <div class="ds-card"><div class="ds-lbl">Monthly Budget</div><div class="ds-val p">₹10,000</div></div>
+        <div class="ds-card"><div class="ds-lbl">Spent So Far</div><div class="ds-val r">₹<span id="demoSpent">6,450</span></div></div>
+        <div class="ds-card"><div class="ds-lbl">Left to Spend</div><div class="ds-val g">₹<span id="demoLeft">3,550</span></div></div>
+      </div>
+      <!-- Add Form -->
+      <div class="add-form">
+        <div class="add-form-lbl">⚡ Quick Add Expense</div>
+        <div class="form-row">
+          <select id="demoCategory">
+            <option value="food">🍔 Food & Cafés</option>
+            <option value="transport">🚗 Transport</option>
+            <option value="shopping">🛍️ Shopping</option>
+            <option value="entertainment">🎬 Entertainment</option>
+            <option value="health">💊 Health</option>
+            <option value="other">📌 Other</option>
+          </select>
+          <input id="demoDesc" class="fi" type="text" placeholder="What did you buy?">
+          <input id="demoAmt" class="fa" type="number" placeholder="₹ Amount" min="1">
+          <button class="add-btn" onclick="addExpense()">+ Add</button>
+        </div>
+      </div>
+      <!-- Category Budgets -->
+      <div class="cat-budgets">
+        <div class="cb-title">Category Budgets</div>
+        <div id="catBudgets"></div>
+      </div>
+      <!-- Savings -->
+      <div class="savings-banner">
+        <div>
+          <div class="sb-label">Savings Goal</div>
+          <div class="sb-goal">🏖️ Trip Fund</div>
+          <div class="sb-bar"><div class="sb-fill" id="sbFill" style="width:67%"></div></div>
+        </div>
+        <div style="text-align:right;">
+          <div class="sb-pct" id="sbPct">67%</div>
+          <div class="sb-pct-lbl">of ₹5,000 goal</div>
+        </div>
+      </div>
+      <!-- Transactions -->
+      <div class="txn-section">
+        <div class="txn-title">📋 Recent Transactions</div>
+        <div class="txn-list" id="txnList">
+          <div class="txn-row">
+            <div class="txn-l"><div class="txn-ico food">🍕</div><div><div class="txn-name">Lunch at college cafeteria</div><div class="txn-date">Today, 1:30 PM</div></div></div>
+            <div class="txn-amt">-₹120</div>
+          </div>
+          <div class="txn-row">
+            <div class="txn-l"><div class="txn-ico transport">🚌</div><div><div class="txn-name">Bus pass recharge</div><div class="txn-date">Yesterday</div></div></div>
+            <div class="txn-amt">-₹500</div>
+          </div>
+          <div class="txn-row">
+            <div class="txn-l"><div class="txn-ico shopping">📚</div><div><div class="txn-name">Study books</div><div class="txn-date">3 days ago</div></div></div>
+            <div class="txn-amt">-₹350</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:28px;">
+      <a href="expense-ledger.html" class="btn-primary">🚀 Open Full Expense Ledger →</a>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-sec">
+  <div class="container">
+    <h2>The goal isn't to stop<br>students spending.</h2>
+    <p>It's to help them spend <strong>with intention.</strong></p>
+    <div class="cta-tags">
+      <span class="cta-tag">Plan 📋</span>
+      <span class="cta-tag">Track 📊</span>
+      <span class="cta-tag">Save 🏆</span>
+    </div>
+    <div class="cta-btns">
+      <a href="#demo" class="btn-white">✨ Try the Demo</a>
+      <a href="expense-ledger.html" class="btn-ghost">📒 Open Expense Ledger</a>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="ft-inner">
+    <div class="ft-logo">💸 PocketWise</div>
+    <div class="ft-tag">Finance, Made Student-Friendly.</div>
+    <div class="ft-links">
+      <a href="#hero">Home</a>
+      <a href="#problem">Problem</a>
+      <a href="#solution">Solution</a>
+      <a href="#how">How It Works</a>
+      <a href="#impact">Impact</a>
+      <a href="#demo">Demo</a>
+    </div>
+    <div class="ft-div"></div>
+    <div class="ft-copy">© 2024 PocketWise · Built for Hackathon · Plan · Track · Save</div>
+  </div>
+</footer>
+
+<script>
+  // Nav scroll shadow
+  window.addEventListener('scroll', () => {
+    document.getElementById('nav').classList.toggle('scrolled', window.scrollY > 30);
+  });
+
+  // Scroll reveal
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+
+  // Animate progress bars in mockup
+  setTimeout(() => {
+    document.querySelectorAll('.prog-fill').forEach(el => {
+      const w = el.style.width; el.style.width = '0';
+      setTimeout(() => el.style.width = w, 200);
+    });
+  }, 500);
+
+  // Demo state
+  const BUDGET = 10000;
+  const CATS = {
+    food:          { label:'🍔 Food & Cafés',   limit:2500, spent:1900 },
+    transport:     { label:'🚗 Transport',       limit:1500, spent:1200 },
+    shopping:      { label:'🛍️ Shopping',       limit:2000, spent: 950 },
+    entertainment: { label:'🎬 Entertainment',   limit:1000, spent: 400 },
+    health:        { label:'💊 Health',          limit: 800, spent:   0 },
+    other:         { label:'📌 Other',           limit:2200, spent:   0 }
+  };
+  const ICONS = { food:'🍕', transport:'🚌', shopping:'🛍️', entertainment:'🎬', health:'💊', other:'📌' };
+  let userTxns = [];
+
+  function totalSpent() {
+    const base = Object.values(CATS).reduce((s, c) => s + c.spent, 0);
+    return base + userTxns.reduce((s, t) => s + t.amt, 0);
+  }
+
+  function renderDash() {
+    const spent = totalSpent();
+    const left = Math.max(0, BUDGET - spent);
+    document.getElementById('demoSpent').textContent = spent.toLocaleString('en-IN');
+    document.getElementById('demoLeft').textContent = left.toLocaleString('en-IN');
+
+    const pct = spent / BUDGET;
+    const nudge = document.getElementById('nudgeCard');
+    if (pct >= 0.9) {
+      nudge.textContent = '⚠️ You\'re at ' + Math.round(pct*100) + '% of your budget! Slow down.';
+      nudge.style.cssText = 'background:linear-gradient(135deg,#FEE2E2,#FECACA);border:1px solid #FCA5A5;color:#991B1B;border-radius:10px;padding:12px 18px;display:flex;align-items:center;gap:10px;font-size:13.5px;font-weight:500;';
+    } else if (pct >= 0.65) {
+      nudge.textContent = '💡 You\'re at ' + Math.round(pct*100) + '% of budget — keep ₹500 for your savings goal.';
+      nudge.style.cssText = 'background:linear-gradient(135deg,#FFF7ED,#FFEDD5);border:1px solid #FED7AA;color:#92400E;border-radius:10px;padding:12px 18px;display:flex;align-items:center;gap:10px;font-size:13.5px;font-weight:500;';
+    } else {
+      nudge.textContent = '✅ Great going! You\'re well within budget this month.';
+      nudge.style.cssText = 'background:linear-gradient(135deg,#F0FDF4,#DCFCE7);border:1px solid #86EFAC;color:#166534;border-radius:10px;padding:12px 18px;display:flex;align-items:center;gap:10px;font-size:13.5px;font-weight:500;';
+    }
+    renderCatBudgets();
+  }
+
+  function renderCatBudgets() {
+    const el = document.getElementById('catBudgets');
+    el.innerHTML = Object.entries(CATS).map(([key, cat]) => {
+      const extra = userTxns.filter(t => t.cat === key).reduce((s, t) => s + t.amt, 0);
+      const spent = cat.spent + extra;
+      const pct = Math.min(100, (spent / cat.limit) * 100);
+      const color = pct >= 90 ? '#FF6B6B' : pct >= 70 ? '#FFA94D' : '#6C63FF';
+      return `<div class="cb-row">
+        <div class="cb-top"><span>${cat.label}</span><span class="used">₹${spent.toLocaleString('en-IN')} <span style="color:var(--text3)">/ ₹${cat.limit.toLocaleString('en-IN')}</span></span></div>
+        <div class="prog-bar"><div style="height:100%;width:${pct}%;background:linear-gradient(90deg,${color},${color}99);border-radius:100px;transition:width 0.5s ease;"></div></div>
+      </div>`;
+    }).join('');
+  }
+
+  function addExpense() {
+    const cat = document.getElementById('demoCategory').value;
+    const desc = document.getElementById('demoDesc').value.trim() || CATS[cat].label.replace(/^\S+\s/, '');
+    const amt = parseFloat(document.getElementById('demoAmt').value);
+    const amtEl = document.getElementById('demoAmt');
+    if (isNaN(amt) || amt <= 0) {
+      amtEl.style.borderColor = '#FF6B6B';
+      amtEl.focus();
+      setTimeout(() => amtEl.style.borderColor = 'var(--border)', 1500);
+      return;
+    }
+    userTxns.unshift({ cat, desc, amt, time: new Date() });
+    document.getElementById('demoDesc').value = '';
+    amtEl.value = '';
+    renderTransactions();
+    renderDash();
+  }
+
+  function renderTransactions() {
+    const el = document.getElementById('txnList');
+    const userHtml = userTxns.slice(0, 4).map(t => {
+      const diff = Math.round((new Date() - t.time) / 60000);
+      const ts = diff < 1 ? 'Just now' : diff < 60 ? diff + 'm ago' : 'Today';
+      return `<div class="txn-row" style="animation:fadeIn 0.3s ease;">
+        <div class="txn-l">
+          <div class="txn-ico ${t.cat}">${ICONS[t.cat]||'📌'}</div>
+          <div><div class="txn-name">${t.desc}</div><div class="txn-date">${ts}</div></div>
+        </div>
+        <div class="txn-amt">-₹${t.amt.toLocaleString('en-IN')}</div>
+      </div>`;
+    }).join('');
+    const defaults = `
+      <div class="txn-row"><div class="txn-l"><div class="txn-ico food">🍕</div><div><div class="txn-name">Lunch at college cafeteria</div><div class="txn-date">Today, 1:30 PM</div></div></div><div class="txn-amt">-₹120</div></div>
+      <div class="txn-row"><div class="txn-l"><div class="txn-ico transport">🚌</div><div><div class="txn-name">Bus pass recharge</div><div class="txn-date">Yesterday</div></div></div><div class="txn-amt">-₹500</div></div>
+      <div class="txn-row"><div class="txn-l"><div class="txn-ico shopping">📚</div><div><div class="txn-name">Study books</div><div class="txn-date">3 days ago</div></div></div><div class="txn-amt">-₹350</div></div>`;
+    el.innerHTML = userHtml + defaults;
+  }
+
+  document.getElementById('demoAmt').addEventListener('keydown', e => { if (e.key === 'Enter') addExpense(); });
+  document.getElementById('demoMonth').textContent = new Date().toLocaleString('en-IN', { month:'long' });
+
+  renderDash();
+</script>
+</body>
+</html>
