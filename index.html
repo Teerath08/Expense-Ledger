@@ -63,8 +63,6 @@
   .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:38px;padding:0 14px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--muted);font-size:13.5px;font-weight:600;cursor:pointer;text-decoration:none;transition:border-color .15s,color .15s,background .15s,transform .15s,box-shadow .15s;}
   .btn:hover{border-color:var(--primary);color:var(--primary);background:#FCFBFF;transform:translateY(-1px);box-shadow:0 5px 14px rgba(108,99,255,.10);}
   .btn:active{transform:translateY(0) scale(.98);}
-  .top-icon{width:40px;height:40px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--muted);font-size:17px;display:grid;place-items:center;cursor:pointer;transition:border-color .15s,color .15s,transform .15s,background .15s;}
-  .top-icon:hover{border-color:var(--primary);color:var(--primary);background:#FCFBFF;transform:translateY(-1px);}
   .btn-primary{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:46px;padding:0 22px;border:0;border-radius:10px;background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 6px 18px rgba(108,99,255,.28);transition:transform .15s,box-shadow .15s;}
   .btn-primary:hover{transform:translateY(-1px);box-shadow:0 9px 24px rgba(108,99,255,.36);}
   .btn-block{width:100%;margin-top:4px;}
@@ -378,7 +376,6 @@
         <option value="hi">हिन्दी</option>
       </select>
       <button type="button" class="btn" id="exportBtn" aria-label="Export CSV" data-i18n-aria-label="exportCsv"><span aria-hidden="true">⬇</span> <span class="export-label" data-i18n="exportCsv">Export CSV</span></button>
-      <button type="button" class="top-icon" id="settingsBtn" aria-label="Open budget settings" data-i18n-aria-label="openSettings" title="Budget settings" data-i18n-title="budgetSettingsTitle"><span aria-hidden="true">⚙</span></button>
     </div>
   </div>
 </header>
@@ -572,8 +569,6 @@
       brandSub: "Expense Ledger",
       language: "Language",
       exportCsv: "Export CSV",
-      openSettings: "Open budget settings",
-      budgetSettingsTitle: "Budget settings",
       pageHeading: "Expense ledger",
       pageSubtitle: "Log what you spend, watch each category, and stay inside your monthly budget.",
       tourOpen: "Tutorial",
@@ -702,8 +697,6 @@
       brandSub: "खर्च बही",
       language: "भाषा",
       exportCsv: "CSV डाउनलोड",
-      openSettings: "बजट सेटिंग खोलें",
-      budgetSettingsTitle: "बजट सेटिंग",
       pageHeading: "खर्च बही",
       pageSubtitle: "अपने खर्च दर्ज करें, हर श्रेणी पर नज़र रखें और मासिक बजट में रहें।",
       tourOpen: "ट्यूटोरियल",
@@ -861,8 +854,8 @@
         tip: "The number on each category shows how many expenses it has this month."
       },
       {
-        target: ".top-actions", icon: "🌐", title: "Language and settings",
-        body: "Switch between English and हिन्दी, export your records as a CSV, or open budget settings with the gear.",
+        target: ".top-actions", icon: "🌐", title: "Language and export",
+        body: "Switch between English and हिन्दी, or export your records as a CSV from here.",
         tip: "Your entries stay private in this browser. Clearing site data removes them."
       },
       {
@@ -903,8 +896,8 @@
         tip: "हर श्रेणी पर लिखा नंबर बताता है कि इस महीने उस श्रेणी में कितने खर्च हैं।"
       },
       {
-        target: ".top-actions", icon: "🌐", title: "भाषा और सेटिंग",
-        body: "English और हिन्दी के बीच बदलें, अपने रिकॉर्ड CSV में डाउनलोड करें, या गियर से बजट सेटिंग खोलें।",
+        target: ".top-actions", icon: "🌐", title: "भाषा और एक्सपोर्ट",
+        body: "यहाँ English और हिन्दी के बीच बदलें, या अपने रिकॉर्ड CSV में डाउनलोड करें।",
         tip: "आपके खर्च इसी ब्राउज़र में निजी रहते हैं। साइट डेटा हटाने पर वे हट जाएँगे।"
       },
       {
@@ -1047,7 +1040,7 @@
     entryForm: $("entryForm"), catChips: $("catChips"), desc: $("desc"), amount: $("amount"),
     submitBtn: $("submitBtn"), cancelEdit: $("cancelEdit"), formError: $("formError"), searchBox: $("searchBox"),
     quickChips: $("quickChips"), txnCats: $("txnCats"), txnCount: $("txnCount"), txnList: $("txnList"), exportBtn: $("exportBtn"),
-    langSelect: $("langSelect"), settingsBtn: $("settingsBtn"), budgetDetails: $("budgetDetails"), budgetForm: $("budgetForm"),
+    langSelect: $("langSelect"), budgetDetails: $("budgetDetails"), budgetForm: $("budgetForm"),
     budgetInput: $("budgetInput"), limitGrid: $("limitGrid"), sampleBtn: $("sampleBtn"), clearBtn: $("clearBtn"),
     breakdown: $("breakdown"), editBudgetBtn: $("editBudgetBtn"), toast: $("toast"), toastMsg: $("toastMsg"),
     toastAction: $("toastAction"), year: $("year"), tourBtn: $("tourBtn"), tourOverlay: $("tourOverlay"),
@@ -1920,7 +1913,6 @@
   });
 
   el.exportBtn.addEventListener("click", exportCsv);
-  el.settingsBtn.addEventListener("click", openSettings);
   el.editBudgetBtn.addEventListener("click", openSettings);
   el.budgetDetails.addEventListener("toggle", () => {
     if (el.budgetDetails.open) syncSettings();
