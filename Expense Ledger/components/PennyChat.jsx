@@ -480,7 +480,17 @@ export default function PennyChat() {
   const [copiedToast, setCopiedToast] = useState(false);
 
   const messagesEndRef = useRef(null);
+  const iframeRef = useRef(null);
   const [darkMode, setDarkMode] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    const sync = () => setDarkMode(document.documentElement.classList.contains("dark"));
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const sync = () => setDarkMode(document.documentElement.classList.contains("dark"));
@@ -522,10 +532,39 @@ export default function PennyChat() {
     }
   }, [messages, isThinking, activeTab]);
 
+
+  // Close chat when clicking outside
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = event => {
+      const panel = document.getElementById("penny-chat-panel");
+      const button = document.getElementById("penny-chat-button");
+      if (panel && panel.contains(event.target)) return;
+      if (button && button.contains(event.target)) return;
+      setIsOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [isOpen]);
+
   const analysis = useMemo(
     () => analyzeFullWebsite(mounted ? siteData : readFullWebsiteData()),
     [mounted, siteData]
   );
+
+  // Push full ledger context to the embedded Web AI whenever data/tab changes
+  useEffect(() => {
+    if (activeTab !== "embed") return;
+    const iframe = iframeRef.current;
+    if (!iframe || !iframe.contentWindow) return;
+    const context = buildFullWebsiteContextText(analysis);
+    try {
+      iframe.contentWindow.postMessage(
+        { type: "pocketwise_context", context, analysis },
+        "*"
+      );
+    } catch (error) {}
+  }, [activeTab, analysis]);
 
   const handleSendMessage = textToSend => {
     const text = (textToSend || inputValue).trim();
@@ -591,10 +630,10 @@ export default function PennyChat() {
           right: "20px",
           display: isOpen ? "flex" : "none",
           flexDirection: "column",
-          width: "410px",
-          height: "640px",
-          maxHeight: "calc(100vh - 110px)",
-          maxWidth: "calc(100vw - 32px)",
+          width: expanded ? "min(92vw, 640px)" : "410px",
+          height: expanded ? "min(90vh, 820px)" : "720px",
+          maxHeight: "calc(100vh - 80px)",
+          maxWidth: "calc(100vw - 24px)",
           borderRadius: "18px",
           overflow: "hidden",
           background: "#ffffff",
@@ -673,6 +712,25 @@ export default function PennyChat() {
                 }}
               >
                 📋 {copiedToast ? "Copied!" : "Copy All Data"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setExpanded(prev => !prev)}
+                aria-label={expanded ? "Collapse chat" : "Expand chat"}
+                title={expanded ? "Collapse" : "Expand"}
+                style={{
+                  background: "rgba(255,255,255,0.18)",
+                  border: "none",
+                  borderRadius: "8px",
+                  color: "#fff",
+                  padding: "6px 10px",
+                  fontSize: "11px",
+                  cursor: "pointer",
+                  fontWeight: 600
+                }}
+              >
+                {expanded ? "Collapse" : "Expand"}
               </button>
 
               <button
@@ -775,6 +833,7 @@ export default function PennyChat() {
         {/* Dynamic Financial Coach Banner (Motivating or Danger Alert) */}
         {analysis.budget > 0 && (
           <div
+            className="penny-coach"
             style={{
               padding: "8px 14px",
               fontSize: "11.5px",
@@ -995,10 +1054,10 @@ export default function PennyChat() {
                 onChange={e => setInputValue(e.target.value)}
                 placeholder="Ask Web AI anything about your expenses, budgets, or website…"
                 style={{
-                  flex: 1,
+                  flex: "1",
                   padding: "10px 14px",
-                  borderRadius: "22px",
-                  border: "1px solid #d0d0d0",
+                  borderRadius: "18px",
+                  border: "1px solid #D8D6FF",
                   fontSize: "13px",
                   outline: "none",
                   transition: "border-color 0.2s"
@@ -1035,6 +1094,7 @@ export default function PennyChat() {
         {activeTab === "embed" && (
           <div style={{ display: "flex", flexDirection: "column", flex: 1, position: "relative" }}>
             <div
+              className="penny-bridge"
               style={{
                 background: "#F7F5FF",
                 borderBottom: "1px solid #D8D6FF",
@@ -1073,6 +1133,7 @@ export default function PennyChat() {
               </div>
             </div>
             <iframe
+              ref={iframeRef}
               src={PENNY_URL}
               title="Penny — PocketWise Assistant"
               style={{ width: "100%", height: "100%", border: 0, flex: 1 }}

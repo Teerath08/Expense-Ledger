@@ -563,3 +563,6 @@ html.dark .badge.unlocked .badge-label{color:#FCD34D;}
 #penny-chat-panel[data-theme='dark'] .penny-inputbar{background:#1A1A2E !important;border-color:#2E2E4A !important;}
 #penny-chat-panel[data-theme='dark'] input{background:#22223A !important;color:#E8E8F8 !important;border-color:#2E2E4A !important;}
 #penny-chat-panel[data-theme='dark'] .penny-messages > div > div > div:last-child{background:#22223A !important;border-color:#2E2E4A !important;color:#E8E8F8 !important;}
+
+/* Hide requested chatbot areas */
+.penny-snapshot,.penny-coach,.penny-bridge{display:none !important;}
