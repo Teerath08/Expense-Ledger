@@ -238,24 +238,53 @@ function generatePennyReply(rawPrompt, analysis) {
     query.includes("balance") ||
     query.includes("remaining") ||
     query.includes("left") ||
-    query.includes("how much can i spend")
+    query.includes("how much can i spend") ||
+    query.includes("motivat") ||
+    query.includes("danger") ||
+    query.includes("saving")
   ) {
     if (analysis.budget <= 0) {
-      return `You haven't set an overall monthly budget yet! 💰\n\n• Total spent so far: ${formatCurrency(analysis.totalSpent)} across ${analysis.entryCount} entries.\n• Top category: ${analysis.topCategory ? `${analysis.topCategory.icon} ${analysis.topCategory.label} (${formatCurrency(analysis.topCategory.spent)})` : "N/A"}.\n\n💡 Tip: Set your monthly budget on the main dashboard to track how much you have left!`;
+      return `You haven't set an overall monthly budget yet! 💰\n\n• Total spent so far: ${formatCurrency(analysis.totalSpent)} across ${analysis.entryCount} entries.\n• Top category: ${analysis.topCategory ? `${analysis.topCategory.icon} ${analysis.topCategory.label} (${formatCurrency(analysis.topCategory.spent)})` : "N/A"}.\n\n💡 Tip: Set your monthly budget on the main dashboard to track how much you have left and get automated savings motivation!`;
     }
 
     const isOver = analysis.remainingBudget < 0;
-    const isNear = analysis.budgetUsagePercent >= 85 && !isOver;
+    const isCriticalDanger = analysis.budgetUsagePercent >= 90 && !isOver;
+    const isCaution = analysis.budgetUsagePercent >= 75 && !isOver && !isCriticalDanger;
+    const isGreatSaving = analysis.budgetUsagePercent <= 50 && !isOver;
 
-    return `Here is your current Budget & Balance Status: 💳\n\n` +
-      `• Total Budget: ${formatCurrency(analysis.budget)}\n` +
+    let coachingMessage = "";
+    if (isOver) {
+      coachingMessage =
+        `🚨 CRITICAL DANGER: OVER BUDGET BY ${formatCurrency(Math.abs(analysis.remainingBudget))}!\n\n` +
+        `🛑 Action to Prevent Spending: Immediate emergency spending freeze on all dining out, online shopping, and entertainment. Lock your wallet to survival essentials only!\n\n` +
+        `💪 Encouragement & Recovery: Going over budget happens — don't lose heart! The key is stopping the leak immediately. Log every single rupee, review where money went, and you can recover starting today. You've got this!`;
+    } else if (isCriticalDanger) {
+      coachingMessage =
+        `🚨 DANGER ZONE: ONLY ${formatCurrency(analysis.remainingBudget)} LEFT TO SPEND (${analysis.budgetUsagePercent}% USED)!\n\n` +
+        `🛑 Urgent Spending Warning: You are operating in the danger zone! Put an immediate stop to takeout, cab rides, and all impulsive purchases. Every rupee you protect right now prevents you from sliding into debt.\n\n` +
+        `🛡️ Motivation to Hold the Line: You still have ${formatCurrency(analysis.remainingBudget)} intact! With strict discipline and zero optional spending for the rest of the period, you CAN finish without crossing the red line. Stand strong — finish this cycle victorious!`;
+    } else if (isCaution) {
+      coachingMessage =
+        `⚠️ CAUTION: LOW FUNDS WARNING (${analysis.budgetUsagePercent}% USED)\n\n` +
+        `• You have ${formatCurrency(analysis.remainingBudget)} left to spend.\n` +
+        `• Action: Pump the brakes on discretionary expenses now. Cooking at home and postponing online purchases will safely keep you out of the danger zone!\n` +
+        `• Encouragement: You're still within limits! Stay alert, keep tracking, and guard your remaining balance.`;
+    } else if (isGreatSaving) {
+      coachingMessage =
+        `🌟 INCREDIBLE JOB! YOU ARE SAVING A HUGE AMOUNT OF MONEY! 💰🎉\n\n` +
+        `• You have preserved ${formatCurrency(analysis.remainingBudget)} (${100 - analysis.budgetUsagePercent}% of your budget saved)!\n\n` +
+        `🚀 Motivating Challenge: Your financial discipline right now is extraordinary! Most people struggle to save, but you're mastering it. Don't let up now — challenge yourself to push this savings even further: keep impulse spending at zero, transfer extra savings toward an emergency fund or personal goal, and see how big you can make your surplus by month-end! Real wealth is built one smart decision at a time — you're doing amazing! 🔥💪`;
+    } else {
+      coachingMessage =
+        `✨ GREAT SAVINGS PACE! You have ${formatCurrency(analysis.remainingBudget)} safely preserved (${analysis.budgetUsagePercent}% of budget used).\n\n` +
+        `Keep this inspiring discipline going! Stay mindful on everyday purchases and watch your savings cushion grow steadily. Every rupee you preserve is freedom in your pocket! 🚀`;
+    }
+
+    return `Here is your Live Budget & Balance Status: 💳\n\n` +
+      `• Total Monthly Budget: ${formatCurrency(analysis.budget)}\n` +
       `• Total Spent: ${formatCurrency(analysis.totalSpent)} (${analysis.budgetUsagePercent}% of budget)\n` +
       `• Remaining Balance: ${formatCurrency(analysis.remainingBudget)}\n\n` +
-      (isOver
-        ? `⚠️ Alert: You have exceeded your overall budget by ${formatCurrency(Math.abs(analysis.remainingBudget))}! Consider reviewing optional expenses in ${analysis.topCategory?.label || "your top categories"}.`
-        : isNear
-        ? `⚠️ Heads up: You have used ${analysis.budgetUsagePercent}% of your budget with ${formatCurrency(analysis.remainingBudget)} remaining. Try capping non-essential spending for the rest of the period!`
-        : `✅ Looking healthy! You have ${formatCurrency(analysis.remainingBudget)} left to spend safely.`);
+      coachingMessage;
   }
 
   // 4. Specific category query (Food, Transport, Shopping, Bills, Entertainment, Health, Other)
@@ -397,10 +426,24 @@ function generatePennyReply(rawPrompt, analysis) {
       customTip = "Set category limits for your recurring costs so PocketWise alerts you before you overspend!";
     }
 
+    let coachingNote = "";
+    if (analysis.budget > 0) {
+      if (analysis.remainingBudget < 0) {
+        coachingNote = `\n\n🚨 DANGER ALERT: You've exceeded your budget by ${formatCurrency(Math.abs(analysis.remainingBudget))}! Immediate emergency rule: stop all non-essential and discretionary buys right now. Lock your wallet, track every rupee, and you will regain control! 🛑💪`;
+      } else if (analysis.budgetUsagePercent >= 90) {
+        coachingNote = `\n\n🚨 DANGER ZONE ALERT: Only ${formatCurrency(analysis.remainingBudget)} left (${analysis.budgetUsagePercent}% spent)! Put an emergency freeze on takeout and shopping immediately to avoid debt. You have the discipline to finish this month strong — protect your funds! 🛑✨`;
+      } else if (analysis.budgetUsagePercent <= 50) {
+        coachingNote = `\n\n🌟 SAVINGS MOMENTUM: You have safely kept ${formatCurrency(analysis.remainingBudget)} in your pocket (${100 - analysis.budgetUsagePercent}% budget saved)! Winning with money is all about momentum — take pride in your discipline today, and challenge yourself to put that extra surplus toward your long-term goals! 🚀💰`;
+      } else {
+        coachingNote = `\n\n✨ SAVINGS ENCOURAGEMENT: You have ${formatCurrency(analysis.remainingBudget)} preserved. Keep up the consistent limits and watch your savings cushion compound! 💪`;
+      }
+    }
+
     return `Here are some personalized Money-Saving Tips: 💡\n\n` +
       `1. Focus on your #1 expense: ${customTip}\n\n` +
       `2. Track daily: Logging small ₹20 - ₹100 cash expenses prevents unaccounted leaks.\n\n` +
-      `3. Budget Health: You've spent ${formatCurrency(analysis.totalSpent)} so far. Keep an eye on your remaining ${analysis.budget > 0 ? formatCurrency(analysis.remainingBudget) : "balance"}!`;
+      `3. 50/30/20 Rule: Aim to allocate 50% for Needs, 30% for Wants, and direct at least 20% into savings!` +
+      coachingNote;
   }
 
   // Default response with complete live website context
@@ -514,14 +557,16 @@ export default function PennyChat() {
   };
 
   const quickPrompts = [
+    { label: "💰 Balance Status", query: "What is my remaining budget and balance status?" },
+    { label: "🌟 Motivation", query: "Motivate me on my savings progress and give encouraging words to save more" },
+    { label: "🚨 Danger Check", query: "Am I in danger of overspending or running low on money?" },
     { label: "📊 Summary", query: "Give me an overview summary of my expenses" },
     { label: "🍔 Food Spent", query: "How much did I spend on food?" },
-    { label: "💰 Remaining Balance", query: "What is my remaining budget and balance?" },
-    { label: "🔍 Biggest Expense", query: "What was my highest expense?" },
-    { label: "🕒 Recent Items", query: "Show my recent transactions" },
-    { label: "📁 How to Export", query: "How do I export my data to CSV?" },
-    { label: "💡 Savings Tips", query: "Give me tips to save money based on my habits" }
+    { label: "💡 Savings Tips", query: "Give me tips to save money based on my habits" },
+    { label: "🔍 Biggest Expense", query: "What was my highest expense?" }
   ];
+
+  if (!mounted) return null;
 
   return (
     <>
@@ -713,6 +758,59 @@ export default function PennyChat() {
             {analysis.topCategory ? `${analysis.topCategory.icon} ${analysis.topCategory.label}` : "All Synced"}
           </div>
         </div>
+
+        {/* Dynamic Financial Coach Banner (Motivating or Danger Alert) */}
+        {analysis.budget > 0 && (
+          <div
+            style={{
+              padding: "8px 14px",
+              fontSize: "11.5px",
+              fontWeight: 600,
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "7px",
+              lineHeight: 1.4,
+              background:
+                analysis.remainingBudget < 0 || analysis.budgetUsagePercent >= 90
+                  ? "#fef2f2"
+                  : analysis.budgetUsagePercent >= 75
+                  ? "#fffbeb"
+                  : "#f0fdf4",
+              borderBottom: `1px solid ${
+                analysis.remainingBudget < 0 || analysis.budgetUsagePercent >= 90
+                  ? "#fca5a5"
+                  : analysis.budgetUsagePercent >= 75
+                  ? "#fde68a"
+                  : "#86efac"
+              }`,
+              color:
+                analysis.remainingBudget < 0 || analysis.budgetUsagePercent >= 90
+                  ? "#991b1b"
+                  : analysis.budgetUsagePercent >= 75
+                  ? "#92400e"
+                  : "#14532d"
+            }}
+          >
+            <span style={{ flexShrink: 0 }}>
+              {analysis.remainingBudget < 0 || analysis.budgetUsagePercent >= 90
+                ? "🚨"
+                : analysis.budgetUsagePercent >= 75
+                ? "⚠️"
+                : "🌟"}
+            </span>
+            <span>
+              {analysis.remainingBudget < 0
+                ? `CRITICAL DANGER: Over budget by ${formatCurrency(-analysis.remainingBudget)}! Freeze non-essentials immediately.`
+                : analysis.budgetUsagePercent >= 90
+                ? `DANGER ZONE: Only ${formatCurrency(analysis.remainingBudget)} left (${analysis.budgetUsagePercent}% spent)! Stop non-essentials to protect your funds!`
+                : analysis.budgetUsagePercent >= 75
+                ? `Caution: Low funds remaining (${formatCurrency(analysis.remainingBudget)} left). Slow down discretionary spending!`
+                : analysis.budgetUsagePercent <= 50
+                ? `Super Saver! ${formatCurrency(analysis.remainingBudget)} preserved. Keep crushing it and save even more today! 🚀`
+                : `Solid savings pace! ${formatCurrency(analysis.remainingBudget)} saved. Stay disciplined and grow your cushion! 💪`}
+            </span>
+          </div>
+        )}
 
         {/* Tab 1: Web AI (Live Data) */}
         {activeTab === "native" && (

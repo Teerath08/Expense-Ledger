@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import {
   CATEGORIES,
   CAT,
@@ -52,6 +53,8 @@ function readStoredLedger() {
 export default function LedgerApp() {
   const [ready, setReady] = useState(false);
   const [lang, setLang] = useState("en");
+  const [darkMode, setDarkMode] = useState(false);
+  const [themeAnimating, setThemeAnimating] = useState(false);
   const [ledger, setLedger] = useState(emptyLedger);
   const [view, setView] = useState(() => startOfMonth(new Date()));
   const [editingId, setEditingId] = useState(null);
@@ -60,6 +63,7 @@ export default function LedgerApp() {
   const [desc, setDesc] = useState("");
   const [amount, setAmount] = useState("");
   const [formError, setFormError] = useState("");
+  const [stackedNotice, setStackedNotice] = useState(null);
   const [storageOK, setStorageOK] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [budgetDraft, setBudgetDraft] = useState("0");
@@ -83,6 +87,7 @@ export default function LedgerApp() {
   const toastTimerRef = useRef(null);
   const newRowTimerRef = useRef(null);
   const lastDeletedRef = useRef(null);
+  const stackNoticeTimerRef = useRef(null);
   const tourVisibleRef = useRef(false);
   const tourBtnRef = useRef(null);
   const tourOverlayRef = useRef(null);
@@ -156,6 +161,56 @@ export default function LedgerApp() {
       /* Storage can be unavailable; the tutorial simply opens next time. */
     }
   }, []);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("pocketwise_dark_mode");
+      if (saved === "1") {
+        setDarkMode(true);
+        document.documentElement.classList.add("dark");
+      }
+    } catch (_) {}
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", darkMode);
+    try { localStorage.setItem("pocketwise_dark_mode", darkMode ? "1" : "0"); } catch (_) {}
+  }, [darkMode]);
+
+  function toggleDarkMode(e) {
+    if (themeAnimating) return;
+    setThemeAnimating(true);
+
+    // Grab toggle button center for the ripple origin
+    const btn = e.currentTarget;
+    const rect = btn.getBoundingClientRect();
+    const x = Math.round(rect.left + rect.width / 2);
+    const y = Math.round(rect.top + rect.height / 2);
+    document.documentElement.style.setProperty("--toggle-x", `${x}px`);
+    document.documentElement.style.setProperty("--toggle-y", `${y}px`);
+
+    const goingDark = !darkMode;
+    document.documentElement.dataset.themeDir = goingDark ? "to-dark" : "to-light";
+
+    const doSwitch = () => {
+      flushSync(() => setDarkMode(goingDark));
+    };
+
+    if (
+      typeof document.startViewTransition !== "function" ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      doSwitch();
+      setTimeout(() => setThemeAnimating(false), 500);
+      return;
+    }
+
+    const transition = document.startViewTransition(doSwitch);
+    transition.finished.finally(() => {
+      setThemeAnimating(false);
+      delete document.documentElement.dataset.themeDir;
+    });
+  }
 
   useEffect(() => {
     let ok = true;
@@ -354,8 +409,8 @@ export default function LedgerApp() {
     }
     if (spent === 0) {
       return {
-        tone: "neutral",
-        icon: "💡",
+        tone: "good",
+        icon: "🌱",
         text: isCurrent ? t("statusNoCurrent") : t("statusNoPast", { month: monthLabel })
       };
     }
@@ -363,9 +418,9 @@ export default function LedgerApp() {
       return { tone: "danger", icon: "🚨", text: t("statusOver", { amount: money(-left) }) };
     }
     if (budgetPct >= 90) {
-      return { tone: "warn", icon: "⚠️", text: t("statusNearly", { pct: budgetPct, amount: money(left) }) };
+      return { tone: "danger", icon: "🚨", text: t("statusNearly", { pct: budgetPct, amount: money(left) }) };
     }
-    if (budgetPct >= 70) {
+    if (budgetPct >= 75) {
       return {
         tone: "warn",
         icon: "⚠️",
@@ -376,9 +431,20 @@ export default function LedgerApp() {
         })
       };
     }
+    if (budgetPct <= 45) {
+      return {
+        tone: "good",
+        icon: "🌟",
+        text: t(isCurrent ? "statusSuperSaving" : "statusGoodPast", {
+          pct: budgetPct,
+          amount: money(left),
+          perDay: money(Math.round(left / daysLeft))
+        })
+      };
+    }
     return {
       tone: "good",
-      icon: "✅",
+      icon: "✨",
       text: t(isCurrent ? "statusGoodCurrent" : "statusGoodPast", {
         pct: budgetPct,
         amount: money(left),
@@ -792,9 +858,53 @@ export default function LedgerApp() {
     amountRef.current?.focus();
   }
 
+  function handleCardMouseMove(e) {
+    if (prefersReducedMotion()) return;
+    const card = e.currentTarget;
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const rotateX = -((y - centerY) / centerY) * 8.5;
+    const rotateY = ((x - centerX) / centerX) * 8.5;
+    card.style.transform = `perspective(600px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) translateY(-6px) scale(1.025)`;
+    const glare = card.querySelector(".card-glare");
+    if (glare) {
+      glare.style.opacity = "0.32";
+      glare.style.transform = `translate(${x - 65}px, ${y - 65}px)`;
+    }
+  }
+
+  function handleCardMouseLeave(e) {
+    const card = e.currentTarget;
+    card.style.transform = "perspective(600px) rotateX(0deg) rotateY(0deg) translateY(0) scale(1)";
+    const glare = card.querySelector(".card-glare");
+    if (glare) {
+      glare.style.opacity = "0";
+    }
+  }
+
+  function handleCardMouseDown(e) {
+    e.currentTarget.style.transform = "perspective(600px) scale(0.97)";
+  }
+
+  function handleCardMouseUp(e) {
+    e.currentTarget.style.transform = "perspective(600px) translateY(-6px) scale(1.025)";
+  }
+
   function chooseQuickAmount(value, event) {
-    setAmount(String(value));
+    const currentVal = Number(amount) || 0;
+    const nextVal = currentVal > 0 ? round2(currentVal + value) : value;
+    setAmount(String(nextVal));
     setFormError("");
+
+    clearTimeout(stackNoticeTimerRef.current);
+    setStackedNotice({ added: value, total: nextVal, stacked: currentVal > 0 });
+    stackNoticeTimerRef.current = setTimeout(() => {
+      setStackedNotice(null);
+    }, 2200);
+
     amountRef.current?.focus({ preventScroll: true });
     const wrap = amountWrapRef.current;
     if (wrap) {
@@ -807,7 +917,7 @@ export default function LedgerApp() {
     button.classList.remove("pop");
     void button.offsetWidth;
     button.classList.add("pop");
-    setTimeout(() => button.classList.remove("pop"), 350);
+    setTimeout(() => button.classList.remove("pop"), 400);
   }
 
   function chooseCategoryFilter(category) {
@@ -1066,6 +1176,21 @@ export default function LedgerApp() {
             </select>
             <button
               type="button"
+              className={`theme-toggle${themeAnimating ? " animating" : ""}`}
+              id="themeToggle"
+              aria-label={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              title={darkMode ? "Light Mode" : "Dark Mode"}
+              onClick={toggleDarkMode}
+            >
+              <span className="theme-toggle-track">
+                <span className="theme-toggle-thumb">
+                  <span className="theme-icon sun" aria-hidden="true">☀️</span>
+                  <span className="theme-icon moon" aria-hidden="true">🌙</span>
+                </span>
+              </span>
+            </button>
+            <button
+              type="button"
               className="btn"
               id="exportBtn"
               aria-label={t("exportCsv")}
@@ -1137,7 +1262,14 @@ export default function LedgerApp() {
         </p>
 
         <section className="summary" aria-label={t("summaryAria")}>
-          <article className="sum-card purple budget">
+          <article
+            className="sum-card purple budget"
+            onMouseMove={handleCardMouseMove}
+            onMouseLeave={handleCardMouseLeave}
+            onMouseDown={handleCardMouseDown}
+            onMouseUp={handleCardMouseUp}
+          >
+            <div className="card-glare" aria-hidden="true" />
             <div className="sum-label">{t("monthlyBudget")}</div>
             <div className="sum-value" id="statBudget">{money(ledger.budget)}</div>
             <div className="sum-sub">{t("tapEdit")}</div>
@@ -1151,12 +1283,27 @@ export default function LedgerApp() {
               {t("edit")}
             </button>
           </article>
-          <article className="sum-card orange spent">
+          <article
+            className="sum-card orange spent"
+            onMouseMove={handleCardMouseMove}
+            onMouseLeave={handleCardMouseLeave}
+            onMouseDown={handleCardMouseDown}
+            onMouseUp={handleCardMouseUp}
+          >
+            <div className="card-glare" aria-hidden="true" />
             <div className="sum-label">{t("spent")}</div>
             <div className="sum-value" id="statSpent">{money(spent)}</div>
             <div className="sum-sub" id="statSpentSub">{spentSub}</div>
           </article>
-          <article className={`sum-card left ${left < 0 ? "red" : "green"}`} id="sumLeft">
+          <article
+            className={`sum-card left ${left < 0 ? "red" : "green"}`}
+            id="sumLeft"
+            onMouseMove={handleCardMouseMove}
+            onMouseLeave={handleCardMouseLeave}
+            onMouseDown={handleCardMouseDown}
+            onMouseUp={handleCardMouseUp}
+          >
+            <div className="card-glare" aria-hidden="true" />
             <div className="sum-label">{t("leftToSpend")}</div>
             <div className="sum-value" id="statLeft">{money(left)}</div>
             <div className="sum-sub" id="statLeftSub">{leftSub}</div>
@@ -1232,25 +1379,63 @@ export default function LedgerApp() {
                         onChange={event => {
                           setAmount(event.target.value);
                           setFormError("");
+                          setStackedNotice(null);
                         }}
                       />
+                      {amount && (
+                        <button
+                          type="button"
+                          className="amount-clear-icon"
+                          aria-label="Clear amount"
+                          onClick={() => {
+                            setAmount("");
+                            setStackedNotice(null);
+                            amountRef.current?.focus();
+                          }}
+                        >
+                          ✕
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="quick-amounts">
-                    <span className="quick-label" id="quickLabel">{t("quickLabel")}</span>
+                    <div className="quick-header-row">
+                      <span className="quick-label" id="quickLabel">
+                        {t("quickLabel")} <span className="quick-hint-tag">Tap to stack (+)</span>
+                      </span>
+                      {stackedNotice && (
+                        <span className="stack-badge pop-in" role="status" aria-live="polite">
+                          +{money(stackedNotice.added)} → Total: {money(stackedNotice.total)} ✨
+                        </span>
+                      )}
+                    </div>
                     <div className="quick-chips" id="quickChips" role="group" aria-label={t("quickGroup")}>
                       {QUICK_AMOUNTS.map(value => (
                         <button
                           type="button"
-                          className={`quick-chip${quickActive === value ? " active" : ""}`}
+                          className="quick-chip"
                           key={value}
                           data-amount={value}
                           aria-label={t("setAmountAria", { amount: money(value) })}
                           onClick={event => chooseQuickAmount(value, event)}
                         >
-                          {money(value)}
+                          +{money(value)}
                         </button>
                       ))}
+                      {Number(amount) > 0 && (
+                        <button
+                          type="button"
+                          className="quick-chip clear"
+                          onClick={() => {
+                            setAmount("");
+                            setStackedNotice(null);
+                            amountRef.current?.focus();
+                          }}
+                          title="Reset amount"
+                        >
+                          ↺ Clear
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="form-actions">
