@@ -566,3 +566,7 @@ html.dark .badge.unlocked .badge-label{color:#FCD34D;}
 
 /* Hide requested chatbot areas */
 .penny-snapshot,.penny-coach,.penny-bridge{display:none !important;}
+
+/* Ultra-smooth theme transitions */
+html{transition:background-color .6s ease,color .6s ease;}
+body,.card,.sum-card,.topbar,.theme-toggle,.theme-toggle-thumb,button,input,select{transition:background-color .5s ease,border-color .5s ease,color .5s ease,box-shadow .5s ease,transform .2s ease;}

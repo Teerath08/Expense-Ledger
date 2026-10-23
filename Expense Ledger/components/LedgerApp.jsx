@@ -417,54 +417,51 @@ export default function LedgerApp() {
     } else leftSub = t("summaryLeftMonth");
   }
 
+  const statusSeed = Math.floor(Math.abs(spent * 100 + left * 10 + budgetPct));
+  const pickVariant = (variants) => variants[statusSeed % variants.length];
+
   const status = (() => {
     if (ledger.budget <= 0) {
-      return { tone: "neutral", icon: "💡", text: t("statusNoBudget") };
+      const variants = [t("statusNoBudget")];
+      return { tone: "neutral", icon: "💡", text: pickVariant(variants) };
     }
     if (spent === 0) {
-      return {
-        tone: "good",
-        icon: "🌱",
-        text: isCurrent ? t("statusNoCurrent") : t("statusNoPast", { month: monthLabel })
-      };
+      const variants = [isCurrent ? t("statusNoCurrent") : t("statusNoPast", { month: monthLabel })];
+      return { tone: "good", icon: "🌱", text: pickVariant(variants) };
     }
     if (left < 0) {
-      return { tone: "danger", icon: "🚨", text: t("statusOver", { amount: money(-left) }) };
+      const variants = [
+        t("statusOver", { amount: money(-left) }),
+        t("statusNearly", { pct: budgetPct, amount: money(left) })
+      ];
+      return { tone: "danger", icon: "🚨", text: pickVariant(variants) };
     }
     if (budgetPct >= 90) {
-      return { tone: "danger", icon: "🚨", text: t("statusNearly", { pct: budgetPct, amount: money(left) }) };
+      const variants = [
+        t("statusNearly", { pct: budgetPct, amount: money(left) }),
+        t("statusOver", { amount: money(-left) })
+      ];
+      return { tone: "danger", icon: "🚨", text: pickVariant(variants) };
     }
     if (budgetPct >= 75) {
-      return {
-        tone: "warn",
-        icon: "⚠️",
-        text: t(isCurrent ? "statusAtCurrent" : "statusAtPast", {
-          pct: budgetPct,
-          amount: money(left),
-          perDay: money(Math.round(left / daysLeft))
-        })
-      };
+      const variants = [
+        t(isCurrent ? "statusAtCurrent" : "statusAtPast", { pct: budgetPct, amount: money(left), perDay: money(Math.round(left / daysLeft)) }),
+        t("statusNearly", { pct: budgetPct, amount: money(left) })
+      ];
+      return { tone: "warn", icon: "⚠️", text: pickVariant(variants) };
     }
     if (budgetPct <= 45) {
-      return {
-        tone: "good",
-        icon: "🌟",
-        text: t(isCurrent ? "statusSuperSaving" : "statusGoodPast", {
-          pct: budgetPct,
-          amount: money(left),
-          perDay: money(Math.round(left / daysLeft))
-        })
-      };
+      const variants = [
+        t(isCurrent ? "statusSuperSaving" : "statusGoodPast", { pct: budgetPct, amount: money(left), perDay: money(Math.round(left / daysLeft)) }),
+        t(isCurrent ? "statusGoodCurrent" : "statusGoodPast", { pct: budgetPct, amount: money(left), perDay: money(Math.round(left / daysLeft)) })
+      ];
+      return { tone: "good", icon: "🌟", text: pickVariant(variants) };
     }
-    return {
-      tone: "good",
-      icon: "✨",
-      text: t(isCurrent ? "statusGoodCurrent" : "statusGoodPast", {
-        pct: budgetPct,
-        amount: money(left),
-        perDay: money(Math.round(left / daysLeft))
-      })
-    };
+    const variants = [
+      t(isCurrent ? "statusGoodCurrent" : "statusGoodPast", { pct: budgetPct, amount: money(left), perDay: money(Math.round(left / daysLeft)) }),
+      t(isCurrent ? "statusSuperSaving" : "statusGoodPast", { pct: budgetPct, amount: money(left), perDay: money(Math.round(left / daysLeft)) })
+    ];
+    return { tone: "good", icon: "✨", text: pickVariant(variants) };
   })();
 
   const breakdown = useMemo(() => {
