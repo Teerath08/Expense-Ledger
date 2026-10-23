@@ -132,6 +132,9 @@ export default function LedgerApp() {
       ledgerRef.current = next;
       setLedger(next);
       persist(next);
+      try {
+        window.dispatchEvent(new CustomEvent("pocketwise_ledger_change", { detail: next }));
+      } catch (error) {}
     },
     [persist]
   );

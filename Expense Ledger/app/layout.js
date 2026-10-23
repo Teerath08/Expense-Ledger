@@ -1,4 +1,5 @@
 import "./globals.css";
+import PennyChat from "../components/PennyChat";
 
 export const metadata = {
   title: "PocketWise — Expense Ledger",
@@ -27,7 +28,10 @@ export default function RootLayout({ children }) {
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <PennyChat />
+      </body>
     </html>
   );
 }
