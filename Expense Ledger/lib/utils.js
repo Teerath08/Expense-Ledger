@@ -1,4 +1,4 @@
-import { CATEGORIES, CAT, DEFAULT_BUDGET, DEFAULT_LIMITS } from "./constants";
+import { CATEGORIES, CAT, DEFAULT_BUDGET, DEFAULT_LIMITS, DEFAULT_SAVINGS_GOAL } from "./constants";
 
 export const pad2 = value => String(value).padStart(2, "0");
 export const monthKeyOf = date => `${date.getFullYear()}-${pad2(date.getMonth() + 1)}`;
@@ -43,12 +43,16 @@ export function sanitizeState(raw) {
   const clean = {
     entries: [],
     budget: DEFAULT_BUDGET,
-    limits: { ...DEFAULT_LIMITS }
+    limits: { ...DEFAULT_LIMITS },
+    savingsGoal: DEFAULT_SAVINGS_GOAL
   };
   if (!raw || typeof raw !== "object") return clean;
 
   const budget = Number(raw.budget);
   if (Number.isFinite(budget) && budget >= 0) clean.budget = round2(budget);
+
+  const savingsGoal = Number(raw.savingsGoal);
+  if (Number.isFinite(savingsGoal) && savingsGoal >= 0) clean.savingsGoal = round2(savingsGoal);
 
   if (raw.limits && typeof raw.limits === "object") {
     CATEGORIES.forEach(category => {

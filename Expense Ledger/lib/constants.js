@@ -10,6 +10,7 @@ export const CATEGORIES = [
 
 export const CAT = new Map(CATEGORIES.map(category => [category.id, category]));
 export const DEFAULT_BUDGET = 0;
+export const DEFAULT_SAVINGS_GOAL = 1000;
 export const DEFAULT_LIMITS = {
   food: 0,
   transport: 0,
@@ -25,5 +26,5 @@ export const TOUR_SEEN_KEY = "pocketwise_tour_seen_v1";
 export const QUICK_AMOUNTS = [10, 20, 50, 100, 200, 500];
 
 export function emptyLedger() {
-  return { entries: [], budget: DEFAULT_BUDGET, limits: { ...DEFAULT_LIMITS } };
+  return { entries: [], budget: DEFAULT_BUDGET, limits: { ...DEFAULT_LIMITS }, savingsGoal: DEFAULT_SAVINGS_GOAL };
 }

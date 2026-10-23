@@ -480,6 +480,15 @@ export default function PennyChat() {
   const [copiedToast, setCopiedToast] = useState(false);
 
   const messagesEndRef = useRef(null);
+  const [darkMode, setDarkMode] = useState(false);
+
+  useEffect(() => {
+    const sync = () => setDarkMode(document.documentElement.classList.contains("dark"));
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
 
   // Sync with localStorage & custom events
   useEffect(() => {
@@ -573,6 +582,8 @@ export default function PennyChat() {
       {/* Chat Window Panel */}
       <div
         id="penny-chat-panel"
+        data-theme={darkMode ? "dark" : "light"}
+        className="penny-panel"
         style={{
           position: "fixed",
           zIndex: 99998,
@@ -593,8 +604,9 @@ export default function PennyChat() {
       >
         {/* Header */}
         <div
+          className="penny-header"
           style={{
-            background: "linear-gradient(135deg, #1b4332 0%, #2d6a4f 100%)",
+            background: "linear-gradient(135deg, #4F46E5 0%, #6C63FF 100%)",
             color: "#ffffff",
             padding: "14px 16px",
             display: "flex",
@@ -610,7 +622,7 @@ export default function PennyChat() {
                   width: "36px",
                   height: "36px",
                   borderRadius: "50%",
-                  background: "#40916c",
+                  background: "#8B85FF",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -630,7 +642,7 @@ export default function PennyChat() {
                       width: "7px",
                       height: "7px",
                       borderRadius: "50%",
-                      background: "#52b788",
+                      background: "#A5A0FF",
                       display: "inline-block"
                     }}
                   />
@@ -646,7 +658,7 @@ export default function PennyChat() {
                 title="Copy all website data to clipboard"
                 aria-label="Copy website data"
                 style={{
-                  background: copiedToast ? "#52b788" : "rgba(255,255,255,0.18)",
+                  background: copiedToast ? "#A5A0FF" : "rgba(255,255,255,0.18)",
                   border: "none",
                   borderRadius: "8px",
                   color: "#fff",
@@ -703,7 +715,7 @@ export default function PennyChat() {
                 flex: 1,
                 border: "none",
                 background: activeTab === "native" ? "#ffffff" : "transparent",
-                color: activeTab === "native" ? "#1b4332" : "rgba(255,255,255,0.85)",
+                color: activeTab === "native" ? "#4F46E5" : "rgba(255,255,255,0.85)",
                 fontWeight: activeTab === "native" ? 600 : 400,
                 padding: "6px 8px",
                 borderRadius: "6px",
@@ -720,7 +732,7 @@ export default function PennyChat() {
                 flex: 1,
                 border: "none",
                 background: activeTab === "embed" ? "#ffffff" : "transparent",
-                color: activeTab === "embed" ? "#1b4332" : "rgba(255,255,255,0.85)",
+                color: activeTab === "embed" ? "#4F46E5" : "rgba(255,255,255,0.85)",
                 fontWeight: activeTab === "embed" ? 600 : 400,
                 padding: "6px 8px",
                 borderRadius: "6px",
@@ -735,12 +747,13 @@ export default function PennyChat() {
 
         {/* Live Website Snapshot Bar */}
         <div
+          className="penny-snapshot"
           style={{
-            background: "#f3f9f4",
-            borderBottom: "1px solid #d4ebd8",
+            background: "#F7F5FF",
+            borderBottom: "1px solid #E8E6FF",
             padding: "8px 14px",
             fontSize: "12px",
-            color: "#2d6a4f",
+            color: "#6C63FF",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between"
@@ -754,7 +767,7 @@ export default function PennyChat() {
               </span>
             )}
           </div>
-          <div style={{ fontSize: "11px", color: "#40916c", fontWeight: 600 }}>
+          <div style={{ fontSize: "11px", color: "#8B85FF", fontWeight: 600 }}>
             {analysis.topCategory ? `${analysis.topCategory.icon} ${analysis.topCategory.label}` : "All Synced"}
           </div>
         </div>
@@ -788,7 +801,7 @@ export default function PennyChat() {
                   ? "#991b1b"
                   : analysis.budgetUsagePercent >= 75
                   ? "#92400e"
-                  : "#14532d"
+                  : "#4F46E5"
             }}
           >
             <span style={{ flexShrink: 0 }}>
@@ -817,6 +830,7 @@ export default function PennyChat() {
           <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
             {/* Messages Area */}
             <div
+              className="penny-messages"
               style={{
                 flex: 1,
                 overflowY: "auto",
@@ -844,7 +858,7 @@ export default function PennyChat() {
                           width: "28px",
                           height: "28px",
                           borderRadius: "50%",
-                          background: "#2d6a4f",
+                          background: "#6C63FF",
                           color: "#fff",
                           display: "flex",
                           alignItems: "center",
@@ -861,7 +875,7 @@ export default function PennyChat() {
                         maxWidth: "82%",
                         padding: "10px 14px",
                         borderRadius: isUser ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-                        background: isUser ? "#2d6a4f" : "#ffffff",
+                        background: isUser ? "#6C63FF" : "#ffffff",
                         color: isUser ? "#ffffff" : "#222222",
                         fontSize: "13.5px",
                         lineHeight: "1.5",
@@ -885,7 +899,7 @@ export default function PennyChat() {
                       width: "28px",
                       height: "28px",
                       borderRadius: "50%",
-                      background: "#2d6a4f",
+                      background: "#6C63FF",
                       color: "#fff",
                       display: "flex",
                       alignItems: "center",
@@ -935,9 +949,9 @@ export default function PennyChat() {
                   onClick={() => handleSendMessage(p.query)}
                   style={{
                     whiteSpace: "nowrap",
-                    background: "#f0f7f3",
-                    color: "#2d6a4f",
-                    border: "1px solid #c7e6d4",
+                    background: "#F3F2FF",
+                    color: "#6C63FF",
+                    border: "1px solid #D8D6FF",
                     borderRadius: "12px",
                     padding: "4px 10px",
                     fontSize: "11.5px",
@@ -946,12 +960,12 @@ export default function PennyChat() {
                     transition: "all 0.15s"
                   }}
                   onMouseEnter={e => {
-                    e.currentTarget.style.background = "#2d6a4f";
+                    e.currentTarget.style.background = "#6C63FF";
                     e.currentTarget.style.color = "#ffffff";
                   }}
                   onMouseLeave={e => {
-                    e.currentTarget.style.background = "#f0f7f3";
-                    e.currentTarget.style.color = "#2d6a4f";
+                    e.currentTarget.style.background = "#F3F2FF";
+                    e.currentTarget.style.color = "#6C63FF";
                   }}
                 >
                   {p.label}
@@ -965,6 +979,7 @@ export default function PennyChat() {
                 e.preventDefault();
                 handleSendMessage();
               }}
+              className="penny-inputbar"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -988,7 +1003,7 @@ export default function PennyChat() {
                   outline: "none",
                   transition: "border-color 0.2s"
                 }}
-                onFocus={e => (e.target.style.borderColor = "#2d6a4f")}
+                onFocus={e => (e.target.style.borderColor = "#6C63FF")}
                 onBlur={e => (e.target.style.borderColor = "#d0d0d0")}
               />
               <button
@@ -999,7 +1014,7 @@ export default function PennyChat() {
                   width: "38px",
                   height: "38px",
                   borderRadius: "50%",
-                  background: inputValue.trim() && !isThinking ? "#2d6a4f" : "#cccccc",
+                  background: inputValue.trim() && !isThinking ? "#6C63FF" : "#cccccc",
                   color: "#fff",
                   border: "none",
                   cursor: inputValue.trim() && !isThinking ? "pointer" : "default",
@@ -1021,11 +1036,11 @@ export default function PennyChat() {
           <div style={{ display: "flex", flexDirection: "column", flex: 1, position: "relative" }}>
             <div
               style={{
-                background: "#f0f8f3",
-                borderBottom: "1px solid #c9e8d2",
+                background: "#F7F5FF",
+                borderBottom: "1px solid #D8D6FF",
                 padding: "10px 12px",
                 fontSize: "12px",
-                color: "#1e5138",
+                color: "#4F46E5",
                 display: "flex",
                 flexDirection: "column",
                 gap: "6px"
@@ -1039,7 +1054,7 @@ export default function PennyChat() {
                   type="button"
                   onClick={handleCopyFullContext}
                   style={{
-                    background: copiedToast ? "#52b788" : "#2d6a4f",
+                    background: copiedToast ? "#A5A0FF" : "#6C63FF",
                     color: "#fff",
                     border: "none",
                     borderRadius: "6px",
@@ -1053,7 +1068,7 @@ export default function PennyChat() {
                   {copiedToast ? "✓ Copied to Clipboard!" : "📋 Copy All Data"}
                 </button>
               </div>
-              <div style={{ fontSize: "11px", opacity: 0.85, color: "#2d6a4f" }}>
+              <div style={{ fontSize: "11px", opacity: 0.85, color: "#6C63FF" }}>
                 💡 Click <strong>Copy All Data</strong> and paste (Ctrl+V) in the chat below to provide all your transactions to Web AI!
               </div>
             </div>
@@ -1083,7 +1098,7 @@ export default function PennyChat() {
           borderRadius: "50%",
           border: "none",
           cursor: "pointer",
-          background: "#2d6a4f",
+          background: "#6C63FF",
           color: "#fdf9f3",
           fontSize: "24px",
           boxShadow: "0 6px 20px rgba(45,106,79,0.36), 0 2px 6px rgba(0,0,0,0.15)",

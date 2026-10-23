@@ -68,6 +68,7 @@ export default function LedgerApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [budgetDraft, setBudgetDraft] = useState("0");
   const [limitDrafts, setLimitDrafts] = useState(() => ({ ...emptyLedger().limits }));
+  const [savingsGoalDraft, setSavingsGoalDraft] = useState(() => String(emptyLedger().savingsGoal));
   const [toast, setToast] = useState(null);
   const [newEntryId, setNewEntryId] = useState(null);
   const [tourVisible, setTourVisible] = useState(false);
@@ -232,6 +233,7 @@ export default function LedgerApp() {
     setLedger(nextLedger);
     setBudgetDraft(String(nextLedger.budget));
     setLimitDrafts({ ...nextLedger.limits });
+    setSavingsGoalDraft(String(nextLedger.savingsGoal));
     setReady(true);
 
     if (ok) {
@@ -384,6 +386,18 @@ export default function LedgerApp() {
   const hasBudget = ledger.budget > 0;
   const budgetPct = hasBudget ? Math.round((spent / ledger.budget) * 100) : 0;
   const daysLeft = daysInMonth(now) - now.getDate() + 1;
+
+  const netSavings = Math.max(0, left);
+  const savingsGoal = ledger.savingsGoal || 0;
+  const savingsProgress = savingsGoal > 0 ? Math.min(100, Math.round((netSavings / savingsGoal) * 100)) : 0;
+  const REWARD_BADGES = [
+    { threshold: 500, points: 50, label: "Saver Starter" },
+    { threshold: 1000, points: 100, label: "Smart Saver" },
+    { threshold: 2000, points: 250, label: "Super Saver" },
+    { threshold: 3000, points: 400, label: "Savings Champion" }
+  ];
+  const unlockedBadges = REWARD_BADGES.filter(badge => netSavings >= badge.threshold);
+  const totalRewardPoints = unlockedBadges.reduce((sum, badge) => sum + badge.points, 0);
 
   let spentSub = t("summaryNothing");
   if (spent !== 0) {
@@ -709,6 +723,7 @@ export default function LedgerApp() {
     const current = ledgerRef.current;
     setBudgetDraft(String(current.budget));
     setLimitDrafts({ ...current.limits });
+    setSavingsGoalDraft(String(current.savingsGoal));
   }
 
   function handleBudgetSubmit(event) {
@@ -1573,6 +1588,76 @@ export default function LedgerApp() {
           </div>
 
           <aside className="col-side">
+            <section className="card" aria-labelledby="rewardsTitle">
+              <div className="card-head">
+                <h2 className="card-title" id="rewardsTitle">Monthly Savings Rewards</h2>
+                <span className="card-note">Earn points for saving</span>
+              </div>
+              <div className="rewards-stats">
+                <div className="reward-stat">
+                  <span className="reward-label">Income (budget)</span>
+                  <span className="reward-value">{money(ledger.budget)}</span>
+                </div>
+                <div className="reward-stat">
+                  <span className="reward-label">Expenses</span>
+                  <span className="reward-value">{money(spent)}</span>
+                </div>
+                <div className="reward-stat">
+                  <span className="reward-label">Net savings</span>
+                  <span className="reward-value">{money(netSavings)}</span>
+                </div>
+                <div className="reward-stat">
+                  <span className="reward-label">Reward points</span>
+                  <span className="reward-value">{totalRewardPoints}</span>
+                </div>
+              </div>
+              <div className="savings-goal">
+                <label htmlFor="savingsGoalInput">Monthly savings goal</label>
+                <form
+                  onSubmit={event => {
+                    event.preventDefault();
+                    const value = Number(savingsGoalDraft);
+                    if (!Number.isFinite(value) || value < 0) return;
+                    commitLedger(current => ({ ...current, savingsGoal: round2(value) }));
+                    setSavingsGoalDraft(String(round2(value)));
+                  }}
+                >
+                  <div className="savings-goal-box">
+                    <span className="savings-goal-currency" aria-hidden="true">₹</span>
+                    <input
+                      type="number"
+                      id="savingsGoalInput"
+                      min="0"
+                      step="100"
+                      value={savingsGoalDraft}
+                      onChange={event => setSavingsGoalDraft(event.target.value)}
+                      placeholder="Enter monthly saving goal"
+                    />
+                  </div>
+                  <button type="submit" className="btn-primary btn-block" style={{ marginTop: "8px" }}>
+                    Save goal
+                  </button>
+                </form>
+                <div className="progress-wrap">
+                  <div className="progress-bar" role="progressbar" aria-valuenow={savingsProgress} aria-valuemin="0" aria-valuemax="100">
+                    <div className="progress-fill" style={{ width: `${savingsProgress}%` }} />
+                  </div>
+                  <span className="progress-text">{savingsProgress}% of goal</span>
+                </div>
+              </div>
+              <div className="badges">
+                {REWARD_BADGES.map(badge => {
+                  const unlocked = netSavings >= badge.threshold;
+                  return (
+                    <div key={badge.threshold} className={`badge ${unlocked ? "unlocked" : "locked"}`}>
+                      <span className="badge-icon">{unlocked ? "🏆" : "🔒"}</span>
+                      <span className="badge-label">{badge.label}</span>
+                      <span className="badge-meta">₹{badge.threshold}+ · {badge.points} pts</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
             <section className="card" aria-labelledby="budgetTitle">
               <div className="card-head">
                 <h2 className="card-title" id="budgetTitle">{t("budgetTitle")}</h2>
