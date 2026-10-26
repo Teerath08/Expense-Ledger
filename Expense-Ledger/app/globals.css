@@ -100,19 +100,21 @@
   .theme-toggle:active{transform:scale(.93);}
   html.dark .theme-toggle{border-color:var(--primary);box-shadow:0 0 10px rgba(108,99,255,.2);}
   .theme-toggle-track{display:block;width:100%;height:100%;position:relative;}
+  /* Thumb slides via transform (GPU-composited) — never animates `left` */
   .theme-toggle-thumb{
     position:absolute;top:50%;left:2px;
-    transform:translateY(-50%);
+    transform:translate(0,-50%);
     width:26px;height:26px;
     border-radius:50%;
     background:linear-gradient(135deg,#FFA94D,#E67700);
     box-shadow:0 2px 7px rgba(230,119,0,.5);
     display:flex;align-items:center;justify-content:center;
     overflow:hidden;
-    transition:left .38s cubic-bezier(.34,1.56,.64,1),background .38s ease,box-shadow .38s ease;
+    will-change:transform;
+    transition:transform .45s cubic-bezier(.22,1,.36,1),background .38s ease,box-shadow .38s ease;
   }
   html.dark .theme-toggle-thumb{
-    left:32px;
+    transform:translate(30px,-50%);
     background:linear-gradient(135deg,#7C73FF,#4F46E5);
     box-shadow:0 2px 8px rgba(108,99,255,.6);
   }
@@ -126,28 +128,48 @@
   .theme-icon.moon{opacity:0;transform:scale(0.5) rotate(-60deg);}
   html.dark .theme-icon.sun{opacity:0;transform:scale(0.5) rotate(60deg);}
   html.dark .theme-icon.moon{opacity:1;transform:scale(1) rotate(0deg);}
-  .theme-toggle.animating .theme-toggle-thumb{animation:thumbWobble .55s cubic-bezier(.34,1.56,.64,1);}
-  @keyframes thumbWobble{
-    0%{transform:translateY(-50%) scale(1);}
-    30%{transform:translateY(-50%) scale(.75) rotate(-18deg);}
-    65%{transform:translateY(-50%) scale(1.2) rotate(10deg);}
-    100%{transform:translateY(-50%) scale(1) rotate(0deg);}
+  /* One springy keyframe covers slide + squash so motion never stalls.
+     html.dark + .animating both apply together (same render), so the stats
+     at animation start already reflect the FINAL theme: final dark = thumb
+     must end on the right (ToDark), final light = back to the left. */
+  .theme-toggle.animating .theme-toggle-thumb{animation:thumbWobbleToLight .6s cubic-bezier(.22,1,.36,1) both;}
+  html.dark .theme-toggle.animating .theme-toggle-thumb{animation:thumbWobbleToDark .6s cubic-bezier(.22,1,.36,1) both;}
+  @keyframes thumbWobbleToDark{
+    0%{transform:translate(0,-50%) scale(1);}
+    22%{transform:translate(-5px,-50%) scale(.74) rotate(-20deg);}
+    55%{transform:translate(24px,-50%) scale(1.16) rotate(12deg);}
+    78%{transform:translate(32px,-50%) scale(.94) rotate(-4deg);}
+    100%{transform:translate(30px,-50%) scale(1) rotate(0deg);}
+  }
+  @keyframes thumbWobbleToLight{
+    0%{transform:translate(30px,-50%) scale(1);}
+    22%{transform:translate(35px,-50%) scale(.74) rotate(20deg);}
+    55%{transform:translate(6px,-50%) scale(1.16) rotate(-12deg);}
+    78%{transform:translate(-2px,-50%) scale(.94) rotate(4deg);}
+    100%{transform:translate(0,-50%) scale(1) rotate(0deg);}
   }
 
   /* ── VIEW TRANSITIONS — radial ripple from toggle button ─────── */
-  /* Freeze the old snapshot: no fade, just hold it */
-  ::view-transition-old(root){
+  /* Freeze the snapshots: no fade, just hold — one sliding circle does the motion */
+  ::view-transition-old(root),
+  ::view-transition-new(root){
     animation:none;
     mix-blend-mode:normal;
   }
-  /* Light → Dark: dark new theme expands as circle from toggle */
+  /* Light → Dark: dark theme expands as a circle from the toggle;
+     the outgoing light theme dims slightly so the circle edge feels soft */
   html[data-theme-dir="to-dark"]::view-transition-new(root){
-    animation:theme-ripple-in 550ms cubic-bezier(.4,0,.2,1) forwards;
+    animation:theme-ripple-in 700ms cubic-bezier(.22,1,.36,1) forwards;
     mix-blend-mode:normal;
   }
-  /* Dark → Light: old dark shrinks away; light underneath */
+  html[data-theme-dir="to-dark"]::view-transition-old(root){
+    animation:theme-soft-dim 700ms cubic-bezier(.22,1,.36,1) forwards;
+    mix-blend-mode:normal;
+  }
+  /* Dark → Light: dark circle shrinks away revealing light beneath and
+     fades out fully, so the last pixels never pop off abruptly */
   html[data-theme-dir="to-light"]::view-transition-old(root){
-    animation:theme-ripple-out 500ms cubic-bezier(.4,0,.2,1) forwards;
+    animation:theme-ripple-out 600ms cubic-bezier(.33,0,.2,1) forwards;
     mix-blend-mode:normal;
     z-index:1;
   }
@@ -156,12 +178,26 @@
     mix-blend-mode:normal;
   }
   @keyframes theme-ripple-in{
-    from{clip-path:circle(0% at var(--toggle-x,50%) var(--toggle-y,50%));}
-    to  {clip-path:circle(150% at var(--toggle-x,50%) var(--toggle-y,50%));}
+    from{clip-path:circle(0px at var(--toggle-x,50%) var(--toggle-y,50%));}
+    to  {clip-path:circle(var(--toggle-r,120%) at var(--toggle-x,50%) var(--toggle-y,50%));}
+  }
+  @keyframes theme-soft-dim{
+    from{opacity:1;}
+    to  {opacity:.82;}
   }
   @keyframes theme-ripple-out{
-    from{clip-path:circle(150% at var(--toggle-x,50%) var(--toggle-y,50%));}
-    to  {clip-path:circle(0% at var(--toggle-x,50%) var(--toggle-y,50%));}
+    from{clip-path:circle(var(--toggle-r,120%) at var(--toggle-x,50%) var(--toggle-y,50%));}
+    to  {clip-path:circle(0px at var(--toggle-x,50%) var(--toggle-y,50%));opacity:0;}
+  }
+  /* Expensive backdrop blur + slow color cross-fades pause during the ripple
+     so the clip-path animation stays at a steady 60fps. */
+  html.theme-switching .topbar{
+    backdrop-filter:none;
+    box-shadow:none;
+  }
+  html.theme-switching,
+  html.theme-switching body{
+    transition:none !important;
   }
   /* Respect reduced-motion — instant switch, no clip-path */
   @media(prefers-reduced-motion:reduce){
@@ -563,6 +599,11 @@ html.dark .badge.unlocked .badge-label{color:#FCD34D;}
 #penny-chat-panel[data-theme='dark'] .penny-inputbar{background:#1A1A2E !important;border-color:#2E2E4A !important;}
 #penny-chat-panel[data-theme='dark'] input{background:#22223A !important;color:#E8E8F8 !important;border-color:#2E2E4A !important;}
 #penny-chat-panel[data-theme='dark'] .penny-messages > div > div > div:last-child{background:#22223A !important;border-color:#2E2E4A !important;color:#E8E8F8 !important;}
+
+/* Penny chat follows the theme ripple smoothly instead of snapping */
+#penny-chat-panel,.penny-messages,.penny-inputbar,#penny-chat-panel input,.penny-coach{
+  transition:background-color .45s ease,border-color .45s ease,color .45s ease;
+}
 
 /* Hide requested chatbot areas */
 .penny-snapshot,.penny-coach,.penny-bridge{display:none !important;}

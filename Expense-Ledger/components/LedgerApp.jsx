@@ -25,6 +25,9 @@ import {
   timeLabel,
   uid
 } from "../lib/utils";
+import { LEDGER_AI_SYSTEM, parseAiJson } from "../lib/ai";
+import { mergeUndoEntries, popUndoSnapshot, pushUndoSnapshot } from "../lib/undo";
+import { createVoiceSession, ensureMicPermission, micErrorMessage, normalizeVoiceText } from "../lib/voice";
 
 function prefersReducedMotion() {
   return typeof window !== "undefined" && window.matchMedia
@@ -50,6 +53,9 @@ function readStoredLedger() {
   }
 }
 
+/* The AI occasionally replies with single-quoted JSON or markdown fences
+   despite instructions — parseAiJson (lib/ai.js) handles that defensively. */
+
 export default function LedgerApp() {
   const [ready, setReady] = useState(false);
   const [lang, setLang] = useState("en");
@@ -71,6 +77,23 @@ export default function LedgerApp() {
   const [savingsGoalDraft, setSavingsGoalDraft] = useState(() => String(emptyLedger().savingsGoal));
   const [toast, setToast] = useState(null);
   const [newEntryId, setNewEntryId] = useState(null);
+  const [magicInput, setMagicInput] = useState("");
+  const [isMagicLoading, setIsMagicLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
+  const micButtonRef = useRef(null);
+
+  /* Pulse the mic button with live voice intensity (direct DOM write — no re-renders) */
+  const setMicGlow = level => {
+    const el = micButtonRef.current;
+    if (el) {
+      el.style.boxShadow = `0 0 ${Math.round(10 + level * 26)}px rgba(239,68,68,${(0.3 + level * 0.5).toFixed(2)})`;
+    }
+  };
+  const clearMicGlow = () => {
+    const el = micButtonRef.current;
+    if (el) el.style.boxShadow = "";
+  };
   const [tourVisible, setTourVisible] = useState(false);
   const [tourShown, setTourShown] = useState(false);
   const [tourIndex, setTourIndex] = useState(0);
@@ -154,6 +177,30 @@ export default function LedgerApp() {
     }
   }, []);
 
+  /* Other surfaces (e.g. Penny chat) may write to the ledger directly.
+     Keep this component in sync when the stored state changes externally. */
+  useEffect(() => {
+    const applyExternalLedger = () => {
+      if (!storageRef.current) return;
+      const next = readStoredLedger();
+      const previous = ledgerRef.current;
+      if (JSON.stringify(next) === JSON.stringify(previous)) return;
+
+      ledgerRef.current = next;
+      setLedger(next);
+      setBudgetDraft(String(next.budget));
+      setLimitDrafts({ ...next.limits });
+      setSavingsGoalDraft(String(next.savingsGoal));
+    };
+
+    window.addEventListener("pocketwise_ledger_change", applyExternalLedger);
+    window.addEventListener("storage", applyExternalLedger);
+    return () => {
+      window.removeEventListener("pocketwise_ledger_change", applyExternalLedger);
+      window.removeEventListener("storage", applyExternalLedger);
+    };
+  }, []);
+
   const markTourSeen = useCallback(() => {
     if (!storageRef.current) return;
     try {
@@ -182,13 +229,13 @@ export default function LedgerApp() {
     if (themeAnimating) return;
     setThemeAnimating(true);
 
-    // Grab toggle button center for the ripple origin
     const btn = e.currentTarget;
     const rect = btn.getBoundingClientRect();
     const x = Math.round(rect.left + rect.width / 2);
     const y = Math.round(rect.top + rect.height / 2);
-    document.documentElement.style.setProperty("--toggle-x", `${x}px`);
-    document.documentElement.style.setProperty("--toggle-y", `${y}px`);
+    const root = document.documentElement;
+    root.style.setProperty("--toggle-x", `${x}px`);
+    root.style.setProperty("--toggle-y", `${y}px`);
 
     const goingDark = !darkMode;
     document.documentElement.dataset.themeDir = goingDark ? "to-dark" : "to-light";
@@ -199,16 +246,28 @@ export default function LedgerApp() {
 
     if (
       typeof document.startViewTransition !== "function" ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      prefersReducedMotion()
     ) {
       doSwitch();
       setTimeout(() => setThemeAnimating(false), 500);
       return;
     }
 
+    /* Compute the exact radius so the ripple always reaches the farthest
+       corner — a fixed % can overshoot or undershoot and look uneven. */
+    const endRadius = Math.ceil(
+      Math.hypot(
+        Math.max(x, window.innerWidth - x),
+        Math.max(y, window.innerHeight - y)
+      )
+    );
+    root.style.setProperty("--toggle-r", `${endRadius}px`);
+    root.classList.add("theme-switching");
+
     const transition = document.startViewTransition(doSwitch);
     transition.finished.finally(() => {
       setThemeAnimating(false);
+      root.classList.remove("theme-switching");
       delete document.documentElement.dataset.themeDir;
     });
   }
@@ -254,8 +313,6 @@ export default function LedgerApp() {
     return () => {
       clearTimeout(autoTourTimerRef.current);
     };
-    // This is deliberately a one-time boot effect.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -317,8 +374,6 @@ export default function LedgerApp() {
       cancelAnimationFrame(frame);
       clearTimeout(pulseTimer);
     };
-    // The functions used here intentionally read the current tour step.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tourVisible, tourShown, tourIndex, lang]);
 
   useEffect(() => {
@@ -331,7 +386,6 @@ export default function LedgerApp() {
       window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", onResize);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tourVisible, tourShown, tourIndex, lang]);
 
   useEffect(() => {
@@ -695,6 +749,7 @@ export default function LedgerApp() {
     const entries = current.entries.slice();
     entries.splice(index, 1);
     if (editingId === id) resetForm();
+    pushUndoSnapshot([removed]);
     commitLedger({ ...current, entries });
     lastDeletedRef.current = { entry: removed, index };
     showToast(t("toastDeleted"), {
@@ -839,7 +894,7 @@ export default function LedgerApp() {
         entry.amount.toFixed(2)
       ]);
     });
-    const csv = `\uFEFF${rows.map(row => row.map(csvCell).join(",")).join("\r\n")}`;
+    const csv = `﻿${rows.map(row => row.map(csvCell).join(",")).join("\r\n")}`;
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -865,10 +920,251 @@ export default function LedgerApp() {
     setFormError("");
   }
 
+  async function handleMagicAdd(commandOverride) {
+    const promptText = (commandOverride ?? magicInput).trim();
+    if (!promptText) return;
+    if (typeof commandOverride !== "string") setMagicInput(promptText);
+    setIsMagicLoading(true);
+    setFormError("");
+
+    try {
+      const res = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: promptText,
+          system: LEDGER_AI_SYSTEM
+        })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || `Server Error ${res.status}`);
+      }
+
+      const data = await res.json();
+      const result = parseAiJson(data.text);
+
+      if (!result) {
+        showToast("🤔 I'm not sure how to do that. Try 'Add coffee 50' or 'Remove snacks'");
+        setMagicInput("");
+        return;
+      }
+
+      /* An extracted expense without an explicit action is treated as an add;
+         a bare amount (no category) most likely refers to the savings goal. */
+      const action = result.action || (result.amount != null ? (result.category ? "add" : "setGoal") : "unknown");
+
+      if (action === "add") {
+        const value = round2(Number(result.amount));
+        if (!Number.isFinite(value) || value <= 0) {
+          showToast("❌ Couldn't understand the amount. Try 'Add 250 for pizza'");
+          setMagicInput("");
+          return;
+        }
+
+        const category = CAT.has(result.category) ? result.category : "other";
+        const reason = String(result.reason || "").trim().slice(0, 80) || category;
+        setActiveCategory(category);
+        setAmount(String(value));
+        setDesc(reason);
+        setMagicInput("");
+
+        setTimeout(() => {
+          const current = ledgerRef.current;
+          const ts = Date.now();
+          const createdId = uid();
+
+          const nextEntries = [
+            ...current.entries,
+            { id: createdId, category, reason, amount: value, ts }
+          ];
+
+          commitLedger({ ...current, entries: nextEntries });
+          if (monthKeyOf(new Date(ts)) !== monthKeyOf(view)) {
+            setView(startOfMonth(new Date(ts)));
+          }
+          setNewEntryId(createdId);
+          showToast(`✨ AI added: ${reason}`);
+          setMagicInput("");
+        }, 600);
+      } else if (action === "delete") {
+        const query = (result.query || "").toLowerCase();
+        const current = ledgerRef.current;
+
+        if (!query) {
+          showToast("🔍 Please specify what to remove");
+          setMagicInput("");
+          return;
+        }
+
+        const originalEntries = current.entries.slice();
+        const filteredEntries = current.entries.filter(entry => {
+          const reason = (entry.reason || "").toLowerCase();
+          const category = (CAT.get(entry.category)?.label || "").toLowerCase();
+          return !reason.includes(query) && !category.includes(query);
+        });
+
+        if (filteredEntries.length === originalEntries.length) {
+          showToast(`🔍 Couldn't find "${result.query}" to remove`);
+          setMagicInput("");
+        } else {
+          const removedEntries = originalEntries.filter(entry => !filteredEntries.includes(entry));
+          pushUndoSnapshot(removedEntries);
+          commitLedger({ ...current, entries: filteredEntries });
+          setMagicInput("");
+          showToast(`🗑️ AI removed ${removedEntries.length} expense(s) — say 'undo' to restore`);
+        }
+      } else if (action === "clearAll") {
+        const current = ledgerRef.current;
+        const count = current.entries.length;
+        if (count === 0) {
+          showToast("🗑️ The ledger is already empty");
+          setMagicInput("");
+        } else if (window.confirm(`Remove ALL ${count} expense(s)? This cannot be undone.`)) {
+          if (editingId) resetForm();
+          pushUndoSnapshot(current.entries);
+          commitLedger({ ...current, entries: [] });
+          showToast(`🧹 Cleared all ${count} expense(s) — say 'undo' to restore`);
+          setMagicInput("");
+        } else {
+          setMagicInput("");
+        }
+      } else if (action === "undo") {
+        const popped = popUndoSnapshot();
+        if (!popped) {
+          showToast("🤷 Nothing left to undo");
+        } else {
+          const current = ledgerRef.current;
+          const merged = mergeUndoEntries(popped, current.entries);
+          commitLedger({ ...current, entries: merged });
+          showToast(`↩️ Restored ${popped.length} expense(s)`);
+        }
+        setMagicInput("");
+      } else if (action === "setGoal") {
+        const value = round2(Number(result.amount != null ? result.amount : result.goal));
+        if (!Number.isFinite(value) || value < 0) {
+          showToast("❌ Couldn't understand the goal amount. Try 'Set monthly goal to 5000'");
+          setMagicInput("");
+        } else {
+          const current = ledgerRef.current;
+          commitLedger({ ...current, savingsGoal: value });
+          setSavingsGoalDraft(String(value));
+          showToast(`🎯 Monthly goal updated to ${money(value)}`);
+          setMagicInput("");
+        }
+      } else if (action === "setLimit") {
+        const value = round2(Number(result.amount != null ? result.amount : result.limit));
+        if (!Number.isFinite(value) || value < 0) {
+          showToast("❌ Couldn't understand the limit amount. Try 'Set food limit to 3000'");
+          setMagicInput("");
+          return;
+        }
+
+        const current = ledgerRef.current;
+        const target = (result.category === "all") ? "all" : (CAT.has(result.category) ? result.category : null);
+        if (!target) {
+          showToast("❌ Did you mean which category? Try 'all' or eg. 'food'");
+          setMagicInput("");
+          return;
+        }
+
+        const nextLimits =
+          target === "all"
+            ? Object.fromEntries(CATEGORIES.map(category => [category.id, value]))
+            : { ...current.limits, [target]: value };
+
+        commitLedger({ ...current, limits: nextLimits });
+        setLimitDrafts({ ...nextLimits });
+        showToast(
+          target === "all"
+            ? `🎚️ All category limits set to ${money(value)}`
+            : `🎚️ ${catLabel(target)} limit set to ${money(value)}`
+        );
+        setMagicInput("");
+      } else {
+        showToast("🤔 I'm not sure how to do that. Try 'Add coffee 50' or 'Set food limit to 3000'");
+        setMagicInput("");
+      }
+
+    } catch (e) {
+      console.error(e);
+      showToast(`❌ ${e.message}`);
+    } finally {
+      setIsMagicLoading(false);
+    }
+  }
+
   function selectCategory(category) {
     setActiveCategory(category);
     amountRef.current?.focus();
   }
+
+  /* Voice input via the Web Speech API (Chrome/Edge). Mic permission is
+     probed first so a blocked/missing mic explains itself; recognition is
+     continuous and auto-submits once you finish speaking. */
+  async function startVoiceInput() {
+    const SpeechRecognizer = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognizer) {
+      showToast(micErrorMessage("browser"));
+      return;
+    }
+    if (isListening) {
+      /* UI must end instantly on ⏹; the recording then transmits and
+         transcribes in the background, submitting when it's ready. */
+      clearMicGlow();
+      setIsListening(false);
+      recognitionRef.current?.stop();
+      showToast("🎙️ Processing your recording…");
+      return;
+    }
+
+    setIsListening(true);
+    const permission = await ensureMicPermission();
+    if (!permission.ok) {
+      setIsListening(false);
+      const message = micErrorMessage(permission.name);
+      if (message) showToast(message);
+      return;
+    }
+
+    const controller = createVoiceSession({
+      lang: lang === "hi" ? "hi-IN" : "en-IN",
+      onResult: (finalText, interim) => setMagicInput(finalText || interim),
+      onLevel: setMicGlow,
+      onAutoStop: () => {
+        clearMicGlow();
+        setIsListening(false);
+      },
+      onError: name => {
+        clearMicGlow();
+        const message = micErrorMessage(name);
+        if (message) showToast(message);
+      },
+      onFallback: () => {
+        showToast("🎙️ Record mode: speak your command naturally — press ⏹ or pause 2s after speaking to submit.");
+      },
+      onDone: text => {
+        setIsListening(false);
+        clearMicGlow();
+        const command = normalizeVoiceText(text).trim();
+        if (command) handleMagicAdd(command);
+      }
+    });
+    if (!controller) {
+      setIsListening(false);
+      showToast(micErrorMessage("browser"));
+      return;
+    }
+    recognitionRef.current = controller;
+
+      showToast("🎙️ Listening in record mode… speak your command, press ⏹ when done");
+      try {
+        controller.start();
+      } catch (error) {
+        setIsListening(false);
+      }
+    }
 
   function handleCardMouseMove(e) {
     if (prefersReducedMotion()) return;
@@ -1340,6 +1636,79 @@ export default function LedgerApp() {
                   {editingId ? t("formEditTitle") : t("formAddTitle")}
                 </h2>
                 <span className="card-note">{t("formNote")}</span>
+              </div>
+              <div className="magic-bar" role="group" aria-label="AI Magic Add" style={{
+                display: 'flex',
+                gap: '12px',
+                marginBottom: '24px',
+                padding: '16px',
+                background: 'linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%)',
+                border: '2px solid #3b82f6',
+                borderRadius: '16px',
+                boxShadow: '0 4px 15px rgba(59, 130, 246, 0.2)',
+                fontSize: '16px'
+              }}>
+                <input
+                  type="text"
+                  placeholder="✨ Try 'Spent 200 on coffee' or tap 🎙️ to speak…"
+                  value={magicInput}
+                  onChange={e => setMagicInput(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && handleMagicAdd()}
+                  disabled={isMagicLoading}
+                  style={{
+                    flex: 1,
+                    background: 'transparent',
+                    border: 'none',
+                    outline: 'none',
+                    fontSize: '18px',
+                    fontWeight: '500',
+                    color: '#1e40af'
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={startVoiceInput}
+                  disabled={isMagicLoading}
+                  ref={micButtonRef}
+                  aria-label={isListening ? "Stop listening" : "Voice command: add, remove, set goal or limits"}
+                  aria-pressed={isListening}
+                  style={{
+                    background: isListening ? '#ef4444' : '#ffffff',
+                    color: isListening ? 'white' : '#3b82f6',
+                    border: isListening ? 'none' : '2px solid #3b82f6',
+                    padding: '10px 14px',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '18px',
+                    transition: 'all 0.2s ease',
+                    boxShadow: isListening ? '0 4px 15px rgba(239, 68, 68, 0.4)' : 'none',
+                    minWidth: '52px'
+                  }}
+                >
+                  {isListening ? "⏹" : "🎙️"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMagicAdd()}
+                  disabled={isMagicLoading || !magicInput.trim()}
+                  style={{
+                    background: '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    padding: '10px 20px',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '16px',
+                    transition: 'all 0.2s ease',
+                    boxShadow: '0 4px 0 #2563eb'
+                  }}
+                  onMouseDown={e => e.currentTarget.style.transform = 'translateY(2px)'}
+                  onMouseUp={e => e.currentTarget.style.transform = 'translateY(0)'}
+                >
+                  {isMagicLoading ? "..." : "Magic ✨"}
+                </button>
               </div>
               <form id="entryForm" noValidate onSubmit={handleSubmit}>
                 <div className="cat-chips" id="catChips" role="group" aria-label={t("categoryGroup")}>

@@ -2,7 +2,10 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { CATEGORIES, STORAGE_KEY, LANG_KEY, TOUR_SEEN_KEY } from "../lib/constants";
-import { sanitizeState } from "../lib/utils";
+import { sanitizeState, uid } from "../lib/utils";
+import { createVoiceSession, ensureMicPermission, micErrorMessage, normalizeVoiceText } from "../lib/voice";
+import { LEDGER_AI_SYSTEM, parseAiJson } from "../lib/ai";
+import { mergeUndoEntries, popUndoSnapshot, pushUndoSnapshot } from "../lib/undo";
 
 const PENNY_URL = "https://friendly-orbit-chat-companion.lovable.app/";
 
@@ -33,6 +36,347 @@ function readFullWebsiteData() {
   } catch (err) {}
 
   return { ledger, lang, tourSeen };
+}
+
+const CATEGORY_KEYWORDS = [
+  ["food", ["food", "coffee", "pizza", "lunch", "dinner", "breakfast", "restaurant", "snack", "snacks", "tea", "chai", "groceries", "burger", "meal", "eat"]],
+  ["transport", ["transport", "auto", "uber", "ola", "taxi", "cab", "bus", "metro", "train", "fuel", "petrol", "bike", "flight"]],
+  ["shopping", ["shopping", "clothes", "shoes", "amazon", "flipkart", "myntra", "gift"]],
+  ["bills", ["bill", "bills", "electricity", "water", "rent", "wifi", "internet", "phone", "recharge", "emi"]],
+  ["entertainment", ["movie", "netflix", "game", "games", "concert", "entertainment", "spotify"]],
+  ["health", ["medicine", "doctor", "hospital", "pharmacy", "gym", "medical", "health"]]
+];
+
+/* Understand plain commands like "add 250 for pizza" or "spent 60 on auto". */
+function parseExpenseCommand(text) {
+  const lower = text.toLowerCase();
+
+  if (!/\b(add|log|record|spent|spend|paid|pay|bought|purchase|expense)\b/.test(lower)) return null;
+
+  const numberMatch = lower.match(/(?:₹|rs\.?|inr)?\s*(\d[\d,]*(?:\.\d+)?)/);
+  if (!numberMatch) return null;
+
+  const amount = Number(numberMatch[1].replace(/,/g, ""));
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 100000000) return null;
+
+  let category = "other";
+  for (const [id, keywords] of CATEGORY_KEYWORDS) {
+    if (keywords.some(keyword => lower.includes(keyword))) {
+      category = id;
+      break;
+    }
+  }
+
+  let reason = text
+    .replace(/(?:₹|rs\.?|inr)?\s*\d[\d,.]*(?:\.\d+)?/gi, " ")
+    .replace(/\b(res?|inr|rupees?|bucks?)\b/gi, " ")
+    .replace(/\b(add|log|record|spent|spend|paid|pay|bought|purchase|expense|on|for|today|yesterday|to|the|a|an)\b/gi, " ")
+    .replace(/[^\p{L}\p{N}'&-]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (reason.length > 80) reason = reason.slice(0, 80);
+  return { amount, category, reason: reason || "Added via Penny" };
+}
+
+/* Write a parsed expense straight into PocketWise storage and notify the app. */
+function writeExpenseToLedger({ amount, category, reason }) {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const ledger = sanitizeState(raw ? JSON.parse(raw) : null);
+    const entry = { id: uid(), category, reason, amount, ts: Date.now() };
+    const next = { ...ledger, entries: [...ledger.entries, entry] };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    window.dispatchEvent(new CustomEvent("pocketwise_ledger_change", { detail: next }));
+    return next;
+  } catch (error) {
+    return null;
+  }
+}
+
+/* Understand commands like "set my monthly goal to 5000" or "change target 2000".
+   Question-shaped messages ("what is my goal?") are left to the normal replies. */
+function parseGoalCommand(text) {
+  const lower = text.toLowerCase();
+
+  if (!/\b(goal|target|milestone)\b/.test(lower)) return null;
+  if (!/\b(set|change|update|make|fix|edit|adjust|increase|decrease|reduce|raise|keep|now)\b/.test(lower)) return null;
+
+  const numberMatch = lower.match(/(?:₹|rs\.?|inr)?\s*(\d[\d,]*(?:\.\d+)?)/);
+  if (!numberMatch) return null;
+
+  const amount = Number(numberMatch[1].replace(/,/g, ""));
+  if (!Number.isFinite(amount) || amount < 0 || amount > 100000000) return null;
+  return { amount };
+}
+
+/* Persist a new monthly savings goal and notify the app. */
+function writeSavingsGoal(amount) {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const ledger = sanitizeState(raw ? JSON.parse(raw) : null);
+    const next = { ...ledger, savingsGoal: amount };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    window.dispatchEvent(new CustomEvent("pocketwise_ledger_change", { detail: next }));
+    return next;
+  } catch (error) {
+    return null;
+  }
+}
+
+/* "undo" / "restore" / "bring back the entries I removed" — restore whatever
+   the last removal took away (works across chat, voice and dashboard). */
+function parseUndoCommand(text) {
+  const lower = text.toLowerCase();
+  if (!/\b(undo|revert|restore|bring back|put back)\b/.test(lower)) return null;
+  return { wantsUndo: true };
+}
+
+/* Understand limit commands like "set food limit 3000",
+   "change limit of all categories to 1000" or "increase shopping limit to 2000". */
+function parseLimitCommand(text) {
+  const lower = text.toLowerCase();
+
+  if (!/\blimits?\b/.test(lower)) return null;
+  if (!/\b(set|change|update|make|fix|edit|adjust|increase|decrease|reduce|raise|keep|allocate|now)\b/.test(lower)) return null;
+
+  const numbers = [...lower.matchAll(/(?:₹|rs\.?|inr)?"?(\d[\d,]*(?:\.\d+)?)"?/g)]
+    .map(match => Number(match[1].replace(/,/g, "")))
+    .filter(Number.isFinite);
+  if (!numbers.length) return null;
+  const amount = numbers[numbers.length - 1];
+  if (amount < 0 || amount > 100000000) return null;
+
+  let category = "other";
+  if (/\b(all|every|whole|everything|entire)\b/.test(lower)) {
+    category = "all";
+  } else {
+    let found = null;
+    for (const [id, keywords] of CATEGORY_KEYWORDS) {
+      if (keywords.some(keyword => lower.includes(keyword))) {
+        found = id;
+        break;
+      }
+    }
+    category = found && found !== "other" ? found : (/(\bother\b|misc)/.test(lower) ? "other" : found);
+  }
+  if (!category) return null;
+  return { category, amount };
+}
+
+function writeCategoryLimit(category, amount) {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const ledger = sanitizeState(raw ? JSON.parse(raw) : null);
+    const nextLimits =
+      category === "all"
+        ? Object.fromEntries(CATEGORIES.map(item => [item.id, amount]))
+        : { ...ledger.limits, [category]: amount };
+    const next = { ...ledger, limits: nextLimits };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    window.dispatchEvent(new CustomEvent("pocketwise_ledger_change", { detail: next }));
+    return next;
+  } catch (error) {
+    return null;
+  }
+}
+
+/* Understand remove commands like "remove pizza", "delete 250",
+   "cancel lunch yesterday" — or "remove all expenses" (wipe everything). */
+function parseRemoveCommand(text) {
+  const lower = text.toLowerCase();
+  if (!/\b(remove|delete|cancel|erase|clear|wipe|undo|take off)\b/.test(lower)) return null;
+
+  const numberMatch = lower.match(/(?:₹|rs\.?|inr)?\s*(\d[\d,]*(?:\.\d+)?)/);
+  const exactAmount = numberMatch
+    ? Number(numberMatch[1].replace(/,/g, ""))
+    : null;
+
+  const query = text
+    .replace(/\b(please|the|my|an|a|entry|entries|expense|expenses|transaction|transactions|from|ledger|list|remove|delete|cancel|erase|clear|wipe|undo)\b/gi, " ")
+    .replace(/(?:₹|rs\.?|inr)?\s*\d[\d,.]*(?:\.\d+)?/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+
+  /* "remove all expenses" / "clear everything" — only when no specific
+     category is named, so "remove all coffee entries" stays partial. */
+  const wantsAll = /\b(all|everything|entire|whole)\b/.test(lower);
+  const mentionsCategory = CATEGORY_KEYWORDS.some(([, keywords]) =>
+    keywords.some(keyword => lower.includes(keyword))
+  );
+  if (wantsAll && !mentionsCategory && exactAmount == null) {
+    return { clearAll: true, query: "", exactAmount: null };
+  }
+
+  if (!query && exactAmount == null) return null;
+  return { clearAll: false, query, exactAmount };
+}
+
+/* Generic words must never fuzzy-match entry reasons ("all" would hit "small ball"). */
+const REMOVE_STOPWORDS = new Set([
+  "all", "everything", "entire", "whole", "expenses", "expense", "entries", "entry",
+  "transactions", "transaction", "ledger", "spending", "history", "records", "record",
+  "thing", "things", "it", "them", "that", "this", "they"
+]);
+
+/* Delete matching entries and return what was removed. */
+function writeRemoveFromLedger({ query, exactAmount }) {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const ledger = sanitizeState(raw ? JSON.parse(raw) : null);
+    const tokens = query
+      ? query.split(" ").filter(Boolean).filter(token => !REMOVE_STOPWORDS.has(token))
+      : [];
+    if (!tokens.length && exactAmount == null) return null;
+    const removed = [];
+    const kept = ledger.entries.filter(entry => {
+      const reason = (entry.reason || "").toLowerCase();
+      const cat = (CATEGORIES.find(item => item.id === entry.category)?.label || entry.category).toLowerCase();
+      const matched =
+        (tokens.length > 0 &&
+          (tokens.some(token => token.length > 2 && (reason.includes(token) || cat.includes(token))) ||
+            (query && (reason.includes(query) || cat.includes(query))))) ||
+        (exactAmount != null && Number(entry.amount) === exactAmount);
+      if (matched) removed.push(entry);
+      return !matched;
+    });
+
+    if (removed.length === 0 || kept.length === ledger.entries.length) return null;
+    pushUndoSnapshot(removed);
+    const next = { ...ledger, entries: kept };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    window.dispatchEvent(new CustomEvent("pocketwise_ledger_change", { detail: next }));
+    return { next, removed };
+  } catch (error) {
+    return null;
+  }
+}
+
+/* Wipe every entry (budget/limits/goal untouched) and notify the app. */
+function writeClearAllLedger() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const ledger = sanitizeState(raw ? JSON.parse(raw) : null);
+    if (ledger.entries.length === 0) return null;
+    pushUndoSnapshot(ledger.entries);
+    const next = { ...ledger, entries: [] };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    window.dispatchEvent(new CustomEvent("pocketwise_ledger_change", { detail: next }));
+    return next;
+  } catch (error) {
+    return null;
+  }
+}
+
+/* Undo the most recent removal: re-inserts its popped snapshot entries. */
+function restoreUndoSnapshot() {
+  try {
+    const popped = popUndoSnapshot();
+    if (!popped || !popped.length) return null;
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const ledger = sanitizeState(raw ? JSON.parse(raw) : null);
+    const merged = mergeUndoEntries(popped, ledger.entries);
+    const next = { ...ledger, entries: merged };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    window.dispatchEvent(new CustomEvent("pocketwise_ledger_change", { detail: next }));
+    return { next, restoredCount: popped.length };
+  } catch (error) {
+    return null;
+  }
+}
+
+/* Voice-to-AI fallback: when the local parsers can't fully understand a
+   spoken command, the AI extractor handles add/delete/goal/limit reliably. */
+async function runVoiceAiCommand(prompt) {
+  const fmt = value => Number(value).toLocaleString("en-IN");
+  try {
+    const res = await fetch("/api/ai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, system: LEDGER_AI_SYSTEM })
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const result = parseAiJson(data.text);
+    if (!result) return null;
+
+    const action = result.action || (result.amount != null ? (result.category ? "add" : "setGoal") : "unknown");
+
+    if (action === "add") {
+      const amount = Number(result.amount);
+      if (!(amount > 0)) return null;
+      const category = CATEGORIES.some(item => item.id === result.category) ? result.category : "other";
+      const reason = String(result.reason || "").trim().slice(0, 80) || category;
+      const nextLedger = writeExpenseToLedger({ amount, category, reason });
+      if (!nextLedger) return null;
+      const cat = CATEGORIES.find(item => item.id === category);
+      return {
+        ledger: nextLedger,
+        message: `✅ Added ₹${fmt(amount)} to ${cat?.icon || "📌"} ${cat?.label || "Other"} — "${reason}". Already on your dashboard! 📊`
+      };
+    }
+
+    if (action === "delete") {
+      const removed = writeRemoveFromLedger({ query: String(result.query || "").toLowerCase(), exactAmount: null });
+      if (!removed) return null;
+      const summary = removed.removed
+        .slice(0, 5)
+        .map(entry => `• ₹${fmt(entry.amount)} — "${entry.reason || "Expense"}"`)
+        .join("\n");
+      return {
+        ledger: removed.next,
+        message: `🗑️ Removed ${removed.removed.length} entr${removed.removed.length === 1 ? "y" : "ies"}:\n${summary}`
+      };
+    }
+
+    if (action === "clearAll") {
+      if (!window.confirm("Remove ALL expenses? This cannot be undone.")) return null;
+      const nextLedger = writeClearAllLedger();
+      if (!nextLedger) return null;
+      return { ledger: nextLedger, message: "🧹 Cleared all expenses. Fresh start! 🎉" };
+    }
+
+    if (action === "undo") {
+      const restored = restoreUndoSnapshot();
+      if (!restored) return null;
+      return {
+        ledger: restored.next,
+        message: `↩️ Restored ${restored.restoredCount} expense(s) from your last removal. ✅`
+      };
+    }
+
+    if (action === "setGoal") {
+      const amount = Number(result.amount);
+      if (!(amount >= 0)) return null;
+      const nextLedger = writeSavingsGoal(amount);
+      if (!nextLedger) return null;
+      return { ledger: nextLedger, message: `🎯 Monthly savings goal set to ₹${fmt(amount)}.` };
+    }
+
+    if (action === "setLimit") {
+      const amount = Number(result.amount);
+      if (!(amount >= 0)) return null;
+      const category = result.category === "all"
+        ? "all"
+        : (CATEGORIES.some(item => item.id === result.category) ? result.category : null);
+      if (!category) return null;
+      const nextLedger = writeCategoryLimit(category, amount);
+      if (!nextLedger) return null;
+      const cat = CATEGORIES.find(item => item.id === category);
+      return {
+        ledger: nextLedger,
+        message:
+          category === "all"
+            ? `🎚️ All category limits set to ₹${fmt(amount)} each.`
+            : `🎚️ ${cat?.icon || ""} ${cat?.label || category} limit set to ₹${fmt(amount)}.`
+      };
+    }
+
+    return null;
+  } catch (error) {
+    return null;
+  }
 }
 
 function analyzeFullWebsite(data) {
@@ -477,10 +821,25 @@ export default function PennyChat() {
   ]);
   const [inputValue, setInputValue] = useState("");
   const [isThinking, setIsThinking] = useState(false);
+  const [isVoiceListening, setVoiceListening] = useState(false);
   const [copiedToast, setCopiedToast] = useState(false);
 
   const messagesEndRef = useRef(null);
   const iframeRef = useRef(null);
+  const voiceRef = useRef(null);
+  const micButtonRef = useRef(null);
+
+  /* Pulse the mic button with live voice intensity (direct DOM write — no re-renders) */
+  const setMicGlow = level => {
+    const el = micButtonRef.current;
+    if (el) {
+      el.style.boxShadow = `0 0 ${Math.round(10 + level * 26)}px rgba(239,68,68,${(0.3 + level * 0.5).toFixed(2)})`;
+    }
+  };
+  const clearMicGlow = () => {
+    const el = micButtonRef.current;
+    if (el) el.style.boxShadow = "";
+  };
   const [darkMode, setDarkMode] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
@@ -566,7 +925,7 @@ export default function PennyChat() {
     } catch (error) {}
   }, [activeTab, analysis]);
 
-  const handleSendMessage = textToSend => {
+  const handleSendMessage = (textToSend, viaVoice = false) => {
     const text = (textToSend || inputValue).trim();
     if (!text || isThinking) return;
 
@@ -580,10 +939,113 @@ export default function PennyChat() {
     setInputValue("");
     setIsThinking(true);
 
-    setTimeout(() => {
+    const thinkingTimer = setTimeout(async () => {
       const currentData = readFullWebsiteData();
       const currentAnalysis = analyzeFullWebsite(currentData);
-      const replyText = generatePennyReply(text, currentAnalysis);
+
+      let replyText;
+      const undo = parseUndoCommand(text);
+      const goal = undo ? null : parseGoalCommand(text);
+      const limit = !undo && !goal ? parseLimitCommand(text) : null;
+      const removal = !undo && !goal && !limit ? parseRemoveCommand(text) : null;
+      const expense = !undo && !goal && !limit && !removal ? parseExpenseCommand(text) : null;
+
+      if (undo) {
+        const restored = restoreUndoSnapshot();
+        if (restored) {
+          setSiteData({ ...currentData, ledger: restored.next });
+          replyText = `↩️ Restored ${restored.restoredCount} expense(s) from your last removal. Back on the dashboard! ✅`;
+        } else {
+          replyText = "🤷 There's nothing left to undo — I don't have any recent removals stored.";
+        }
+      } else if (goal) {
+        const nextLedger = writeSavingsGoal(goal.amount);
+        if (nextLedger) {
+          setSiteData({ ...currentData, ledger: nextLedger });
+          const goalAmount = nextLedger.savingsGoal;
+          const spentSoFar = nextLedger.entries.reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
+          replyText =
+            `🎯 Done! Your monthly savings goal is now **₹${goalAmount.toLocaleString("en-IN")}**.\n\n` +
+            (goalAmount > 0
+              ? `You've spent ₹${spentSoFar.toLocaleString("en-IN")} this month, and the dashboard will now track your progress toward the ₹${goalAmount.toLocaleString("en-IN")} goal. 💪`
+              : `The goal has been cleared to ₹0 — set it again anytime.`);
+        } else {
+          replyText = "⚠️ I understood the goal, but couldn't save it (storage may be blocked). Try changing it in the dashboard settings.";
+        }
+      } else if (limit) {
+        const nextLedger = writeCategoryLimit(limit.category, limit.amount);
+        if (nextLedger) {
+          setSiteData({ ...currentData, ledger: nextLedger });
+          const cat = CATEGORIES.find(item => item.id === limit.category);
+          replyText =
+            limit.category === "all"
+              ? `🎚️ Done! The limit for **all categories** is now **₹${limit.amount.toLocaleString("en-IN")}** each. The dashboard reflects it right away.`
+              : `🎚️ Done! The ${cat?.icon || ""} ${cat?.label || limit.category} limit is now **₹${limit.amount.toLocaleString("en-IN")}**. The dashboard reflects it right away.`;
+        } else {
+          replyText = "⚠️ I understood the limit, but couldn't save it (storage may be blocked). Try changing it in the dashboard settings.";
+        }
+      } else if (removal) {
+        if (removal.clearAll) {
+          const count = currentData.ledger.entries.length;
+          if (count === 0) {
+            replyText = "🗑️ Your ledger is already empty — nothing to remove!";
+          } else if (window.confirm(`Remove ALL ${count} expense(s)? This cannot be undone.`)) {
+            const nextLedger = writeClearAllLedger();
+            if (nextLedger) {
+              setSiteData({ ...currentData, ledger: nextLedger });
+              replyText = `🧹 Cleared all ${count} expense(s). Fresh start! 🎉`;
+            } else {
+              replyText = "⚠️ Couldn't clear the ledger (storage may be blocked).";
+            }
+          } else {
+            replyText = "👍 No worries — nothing was deleted.";
+          }
+        } else {
+          const result = writeRemoveFromLedger(removal);
+          if (result) {
+            setSiteData({ ...currentData, ledger: result.next });
+            const summary = result.removed
+              .slice(0, 5)
+              .map(entry => `• ₹${Number(entry.amount).toLocaleString("en-IN")} — "${entry.reason || "Expense"}"`)
+              .join("\n");
+            replyText =
+              `🗑️ Removed ${result.removed.length} entr${result.removed.length === 1 ? "y" : "ies"}:\n${summary}` +
+              (result.removed.length > 5 ? `\n…and ${result.removed.length - 5} more.` : "");
+          } else {
+            replyText = `🔍 I couldn't find a matching expense${removal.query ? ` for "${removal.query}"` : ""}. Tell me the amount or what it was listed as.`;
+          }
+        }
+      } else if (expense) {
+        const nextLedger = writeExpenseToLedger(expense);
+        if (nextLedger) {
+          setSiteData({ ...currentData, ledger: nextLedger });
+          const cat = CATEGORIES.find(item => item.id === expense.category);
+          const spentNow = nextLedger.entries.reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
+          replyText =
+            `✅ Added **₹${expense.amount.toLocaleString("en-IN")}** to ${cat?.icon || "📌"} ${cat?.label || "Other"}` +
+            (expense.reason && expense.reason !== "Added via Penny" ? ` — "${expense.reason}"` : "") +
+            `.\n\nTotal spent so far: ₹${spentNow.toLocaleString("en-IN")} across ${nextLedger.entries.length} transactions. It's already visible on your dashboard! 📊`;
+        } else {
+          replyText = "⚠️ I understood the expense, but couldn't save it (storage may be blocked). Try adding it on the dashboard instead.";
+        }
+      }
+
+      if (!replyText && viaVoice) {
+        /* Voice command the local parsers couldn't handle — let the AI
+           extractor interpret it and act on the ledger. */
+        const executed = await runVoiceAiCommand(text);
+        if (executed) {
+          setSiteData({ ...(readFullWebsiteData()), ledger: executed.ledger });
+          replyText = executed.message;
+        } else {
+          replyText =
+            "🤔 I couldn't understand that command. Try: 'add 250 for pizza', 'remove snacks', 'set monthly goal to 5000' or 'set food limit to 3000'.";
+        }
+      }
+
+      if (!replyText) {
+        replyText = generatePennyReply(text, currentAnalysis);
+      }
 
       const assistantMsg = {
         id: "a_" + Date.now(),
@@ -604,6 +1066,91 @@ export default function PennyChat() {
     });
   };
 
+  /* Voice input via the Web Speech API. Mic permission is probed first so a
+     blocked/missing mic explains itself; recognition is continuous, the
+     transcript shows live in the chat box, and it sends when you finish. */
+  const startVoiceInput = () => {
+    const SpeechRecognizer = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
+    if (!SpeechRecognizer) {
+      setMessages(prev => [
+        ...prev,
+        { id: "a_" + Date.now(), role: "assistant", text: micErrorMessage("browser") }
+      ]);
+      return;
+    }
+    if (isVoiceListening) {
+      /* UI must end instantly on ⏹; transcription continues in background. */
+      clearMicGlow();
+      setVoiceListening(false);
+      setInputValue("⏺ processing audio…");
+      voiceRef.current?.stop();
+      return;
+    }
+
+    setIsOpen(true);
+    setVoiceListening(true);
+    setInputValue("");
+
+    (async () => {
+      const permission = await ensureMicPermission();
+      if (!permission.ok) {
+        setVoiceListening(false);
+        setMessages(prev => [
+          ...prev,
+          { id: "a_" + Date.now(), role: "assistant", text: micErrorMessage(permission.name) || "🎙️ Mic error." }
+        ]);
+        return;
+      }
+
+      const controller = createVoiceSession({
+        lang: siteData.lang === "hi" ? "hi-IN" : "en-IN",
+        onResult: (finalText, interim) => setInputValue(finalText || interim),
+        onLevel: setMicGlow,
+        onAutoStop: () => {
+          clearMicGlow();
+          setVoiceListening(false);
+        },
+        onError: name => {
+          clearMicGlow();
+          const message = micErrorMessage(name);
+          if (message) {
+            setMessages(prev => [
+              ...prev,
+              { id: "a_" + Date.now(), role: "assistant", text: message }
+            ]);
+          }
+        },
+        onFallback: () => {
+          setMessages(prev => [
+            ...prev,
+            {
+              id: "a_" + Date.now(),
+              role: "assistant",
+              text: "🎙️ Record mode: speak your command naturally — press ⏹ or pause 2s after speaking to submit. (This mode is more accurate!)"
+            }
+          ]);
+        },
+        onDone: text => {
+          setVoiceListening(false);
+          clearMicGlow();
+          const command = normalizeVoiceText(text).trim();
+          if (command) handleSendMessage(command, true);
+          else setInputValue("");
+        }
+      });
+      if (!controller) {
+        setVoiceListening(false);
+        return;
+      }
+      voiceRef.current = controller;
+      try {
+        controller.start();
+      } catch (error) {
+        setVoiceListening(false);
+      }
+    })();
+  };
+
   const quickPrompts = [
     { label: "💰 Balance Status", query: "What is my remaining budget and balance status?" },
     { label: "🌟 Motivation", query: "Motivate me on my savings progress and give encouraging words to save more" },
@@ -611,6 +1158,7 @@ export default function PennyChat() {
     { label: "📊 Summary", query: "Give me an overview summary of my expenses" },
     { label: "🍔 Food Spent", query: "How much did I spend on food?" },
     { label: "💡 Savings Tips", query: "Give me tips to save money based on my habits" },
+    { label: "🎯 Set Monthly Goal", query: "Set my monthly savings goal to 2000" },
     { label: "🔍 Biggest Expense", query: "What was my highest expense?" }
   ];
 
@@ -1065,6 +1613,31 @@ export default function PennyChat() {
                 onFocus={e => (e.target.style.borderColor = "#6C63FF")}
                 onBlur={e => (e.target.style.borderColor = "#d0d0d0")}
               />
+              <button
+                type="button"
+                onClick={startVoiceInput}
+                disabled={isThinking}
+                ref={micButtonRef}
+                aria-label={isVoiceListening ? "Stop listening" : "Voice command"}
+                aria-pressed={isVoiceListening}
+                style={{
+                  width: "38px",
+                  height: "38px",
+                  borderRadius: "50%",
+                  background: isVoiceListening ? "#ef4444" : "#F0EEFF",
+                  color: isVoiceListening ? "#fff" : "#6C63FF",
+                  border: "none",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "16px",
+                  transition: "all 0.2s",
+                  boxShadow: isVoiceListening ? "0 0 0 4px rgba(239,68,68,0.2)" : "none"
+                }}
+              >
+                {isVoiceListening ? "⏹" : "🎙️"}
+              </button>
               <button
                 type="submit"
                 disabled={!inputValue.trim() || isThinking}
