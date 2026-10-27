@@ -627,6 +627,12 @@ button,[role="button"],.chip,.quick-chip,.txn-cat{user-select:none;-webkit-user-
   /* Comfortable touch targets for the mic ✨ buttons and controls */
   #magicMicBtn{min-width:56px !important;min-height:50px !important;padding:8px 10px !important;}
   #magicSubmitBtn{min-height:50px !important;}
+  /* Command bar on phones: input gets its own row, mic + Magic share the
+     next row — stops the buttons overflowing the box on narrow screens */
+  .magic-bar{flex-wrap:wrap;gap:10px;}
+  .magic-bar input{flex:1 1 100% !important;min-width:0;}
+  #magicMicBtn{flex:0 0 56px;}
+  #magicSubmitBtn{flex:1;}
   #pennyMicBtn,#pennySendBtn{width:42px !important;height:42px !important;}
   .icon-btn{width:38px;height:38px;}
   .month-btn{width:38px;height:38px;}

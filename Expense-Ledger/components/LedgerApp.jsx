@@ -1692,6 +1692,7 @@ export default function LedgerApp() {
                   disabled={isMagicLoading}
                   style={{
                     flex: 1,
+                    minWidth: 0,
                     background: 'transparent',
                     border: 'none',
                     outline: 'none',
