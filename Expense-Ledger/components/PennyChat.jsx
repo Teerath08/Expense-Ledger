@@ -1226,11 +1226,11 @@ export default function PennyChat() {
         style={{
           position: "fixed",
           zIndex: 99998,
-          bottom: "88px",
+          bottom: "calc(88px + env(safe-area-inset-bottom, 0px))",
           right: "20px",
           display: isOpen ? "flex" : "none",
           flexDirection: "column",
-          width: expanded ? "min(92vw, 640px)" : "410px",
+          width: expanded ? "min(92vw, 640px)" : "min(410px, calc(100vw - 24px))",
           height: expanded ? "min(90vh, 820px)" : "720px",
           maxHeight: "calc(100vh - 80px)",
           maxWidth: "calc(100vw - 24px)",
@@ -1668,6 +1668,7 @@ export default function PennyChat() {
               <button
                 type="button"
                 onClick={startVoiceInput}
+                id="pennyMicBtn"
                 disabled={isThinking}
                 ref={micButtonRef}
                 aria-label={isVoiceListening ? "Stop listening" : "Voice command"}
@@ -1692,6 +1693,7 @@ export default function PennyChat() {
               </button>
               <button
                 type="submit"
+                id="pennySendBtn"
                 disabled={!inputValue.trim() || isThinking}
                 aria-label="Send message"
                 style={{
@@ -1792,14 +1794,6 @@ export default function PennyChat() {
           alignItems: "center",
           justifyContent: "center",
           transition: "transform 0.18s ease, box-shadow 0.18s ease"
-        }}
-        onMouseEnter={e => {
-          e.currentTarget.style.transform = "scale(1.08)";
-          e.currentTarget.style.boxShadow = "0 8px 24px rgba(45,106,79,0.48)";
-        }}
-        onMouseLeave={e => {
-          e.currentTarget.style.transform = "scale(1)";
-          e.currentTarget.style.boxShadow = "0 6px 20px rgba(45,106,79,0.36), 0 2px 6px rgba(0,0,0,0.15)";
         }}
       >
         {isOpen ? "✕" : "💬"}

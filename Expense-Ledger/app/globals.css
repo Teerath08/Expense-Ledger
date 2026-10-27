@@ -611,3 +611,50 @@ html.dark .badge.unlocked .badge-label{color:#FCD34D;}
 /* Ultra-smooth theme transitions */
 html{transition:background-color .6s ease,color .6s ease;}
 body,.card,.sum-card,.topbar,.theme-toggle,.theme-toggle-thumb,button,input,select{transition:background-color .5s ease,border-color .5s ease,color .5s ease,box-shadow .5s ease,transform .2s ease;}
+
+/* ── ANDROID / TOUCH SMOOTHNESS ─────────────────────────────────── */
+/* Kill 300ms tap delays, tap-flash and long-press text selection */
+html{text-size-adjust:100%;-webkit-text-size-adjust:100%;}
+body{-webkit-tap-highlight-color:transparent;}
+button,a,input,select,textarea,summary,label{touch-action:manipulation;}
+button,[role="button"],.chip,.quick-chip,.txn-cat{user-select:none;-webkit-user-select:none;}
+
+/* Magic + mic buttons are inline-styled; ids give them CSS press feedback */
+#magicMicBtn:active,#magicSubmitBtn:active,#penny-chat-button:active{transform:scale(.92) !important;}
+#magicMicBtn,#magicSubmitBtn,#penny-chat-button{user-select:none;-webkit-user-select:none;}
+
+@media (max-width:520px){
+  /* Comfortable touch targets for the mic ✨ buttons and controls */
+  #magicMicBtn{min-width:56px !important;min-height:50px !important;padding:8px 10px !important;}
+  #magicSubmitBtn{min-height:50px !important;}
+  #pennyMicBtn,#pennySendBtn{width:42px !important;height:42px !important;}
+  .icon-btn{width:38px;height:38px;}
+  .month-btn{width:38px;height:38px;}
+}
+
+/* Android fires synthetic :hover on tap — hover transforms would stick on
+   screen after the tap. Motion hovers only run with a real hover pointer. */
+@media (hover:none),(pointer:coarse){
+  .chip:hover{transform:none;box-shadow:none;}
+  .chip:hover span[aria-hidden="true"]{transform:none;}
+  .quick-chip:hover{transform:none;box-shadow:none;}
+  .txn-cat:hover{transform:none;}
+  .txn:hover{transform:none;box-shadow:none;}
+  .btn:hover{transform:none;box-shadow:none;}
+  .btn-primary:hover{transform:none;box-shadow:0 6px 18px rgba(108,99,255,.28);}
+  .btn-ghost:hover{transform:none;}
+  .card-link:hover{transform:none;}
+  .sum-card:hover{transform:none !important;box-shadow:0 10px 26px rgba(26,26,46,.12);}
+  .sum-card:hover .sum-value{transform:none;}
+
+  /* backdrop-filter is the heaviest blur on Android — solid topbar scrolls
+     buttery instead. Keep theme colors identical via CSS variables. */
+  .topbar{backdrop-filter:none;background:rgba(255,255,255,.98);box-shadow:none;}
+  html.dark .topbar{background:rgba(15,15,26,.98);}
+
+  /* Slim the app-wide transitions — one short rule instead of the desktop's
+     long transform/box-shadow eats far less paint when taps cascade */
+  html{transition:none;}
+  body,.card,.sum-card,.topbar,.theme-toggle,button,input,select{transition:background-color .3s ease,border-color .3s ease,color .3s ease,box-shadow .3s ease;}
+  .theme-toggle-thumb{transition:transform .45s cubic-bezier(.22,1,.36,1),background-color .3s ease,box-shadow .3s ease;}
+}

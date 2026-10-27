@@ -294,6 +294,9 @@ export function createMediaRecorderRecognizer({ lang, onResult, onDone, onError,
         let noiseFloor = 0.008;
         const floorSamples = [];
         audioCtx = new AudioContext();
+        /* Android may spawn the context suspended — resume inside the
+           user's tap or the mic glow and silence detection never tick. */
+        if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
         const source = audioCtx.createMediaStreamSource(stream);
         const analyser = audioCtx.createAnalyser();
         analyser.fftSize = 512;

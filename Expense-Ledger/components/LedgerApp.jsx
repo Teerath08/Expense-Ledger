@@ -1191,8 +1191,16 @@ export default function LedgerApp() {
     }
   }
 
+  function canHover() {
+    return typeof window !== "undefined" && window.matchMedia
+      ? window.matchMedia("(hover: hover) and (pointer: fine)").matches
+      : false;
+  }
+
   function handleCardMouseMove(e) {
-    if (prefersReducedMotion()) return;
+    /* Tilt is a pointer effect — Android taps synthesize mousemove and would
+       tilt the card then leave it stuck, so only run with a real pointer. */
+    if (prefersReducedMotion() || !canHover()) return;
     const card = e.currentTarget;
     const rect = card.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -1223,7 +1231,9 @@ export default function LedgerApp() {
   }
 
   function handleCardMouseUp(e) {
-    e.currentTarget.style.transform = "perspective(600px) translateY(-6px) scale(1.025)";
+    e.currentTarget.style.transform = canHover()
+      ? "perspective(600px) translateY(-6px) scale(1.025)"
+      : "";
   }
 
   function chooseQuickAmount(value, event) {
@@ -1693,6 +1703,7 @@ export default function LedgerApp() {
                 <button
                   type="button"
                   onClick={startVoiceInput}
+                  id="magicMicBtn"
                   disabled={isMagicLoading}
                   ref={micButtonRef}
                   aria-label={isListening ? "Stop listening" : "Voice command: add, remove, set goal or limits"}
@@ -1716,6 +1727,7 @@ export default function LedgerApp() {
                 <button
                   type="button"
                   onClick={() => handleMagicAdd()}
+                  id="magicSubmitBtn"
                   disabled={isMagicLoading || !magicInput.trim()}
                   style={{
                     background: '#3b82f6',
