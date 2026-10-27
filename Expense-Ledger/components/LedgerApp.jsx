@@ -1053,6 +1053,19 @@ export default function LedgerApp() {
           showToast(`🎯 Monthly goal updated to ${money(value)}`);
           setMagicInput("");
         }
+      } else if (action === "setBudget") {
+        const value = round2(Number(result.amount));
+        if (!Number.isFinite(value) || value < 0) {
+          showToast("❌ Couldn't understand the budget amount. Try 'Set monthly budget to 5000'");
+          setMagicInput("");
+          return;
+        }
+
+        const current = ledgerRef.current;
+        commitLedger({ ...current, budget: value });
+        setBudgetDraft(String(value));
+        showToast(`💰 Monthly budget set to ${money(value)}`);
+        setMagicInput("");
       } else if (action === "setLimit") {
         const value = round2(Number(result.amount != null ? result.amount : result.limit));
         if (!Number.isFinite(value) || value < 0) {
@@ -1083,7 +1096,7 @@ export default function LedgerApp() {
         );
         setMagicInput("");
       } else {
-        showToast("🤔 I'm not sure how to do that. Try 'Add coffee 50' or 'Set food limit to 3000'");
+        showToast("🤔 I'm not sure how to do that. Try 'Add coffee 50' or 'Set monthly budget to 5000'");
         setMagicInput("");
       }
 

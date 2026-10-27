@@ -110,6 +110,42 @@ function parseGoalCommand(text) {
   return { amount };
 }
 
+/* Persist a new overall monthly budget and notify the app. */
+function writeMonthlyBudget(amount) {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const ledger = sanitizeState(raw ? JSON.parse(raw) : null);
+    const next = { ...ledger, budget: amount };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    window.dispatchEvent(new CustomEvent("pocketwise_ledger_change", { detail: next }));
+    return next;
+  } catch (error) {
+    return null;
+  }
+}
+
+/* Understand commands like "set my monthly budget to 5000" or "change budget 3000".
+   A budget naming a category ("food budget") belongs to parseLimitCommand instead. */
+function parseBudgetCommand(text) {
+  const lower = text.toLowerCase();
+
+  if (!/\bbudget\b/.test(lower)) return null;
+  if (!/\b(set|change|update|make|fix|edit|adjust|increase|decrease|reduce|raise|keep|now)\b/.test(lower)) return null;
+
+  /* A named category means it's a category limit, not the overall budget. */
+  const mentionsCategory = CATEGORY_KEYWORDS.some(([, keywords]) =>
+    keywords.some(keyword => new RegExp(`\\b${keyword}\\b`).test(lower))
+  );
+  if (mentionsCategory || /\b(all|every|entire)\b/.test(lower)) return null;
+
+  const numberMatch = lower.match(/(?:₹|rs\.?|inr)?\s*(\d[\d,]*(?:\.\d+)?)/);
+  if (!numberMatch) return null;
+
+  const amount = Number(numberMatch[1].replace(/,/g, ""));
+  if (!Number.isFinite(amount) || amount < 0 || amount > 100000000) return null;
+  return { amount };
+}
+
 /* Persist a new monthly savings goal and notify the app. */
 function writeSavingsGoal(amount) {
   try {
@@ -344,6 +380,14 @@ async function runVoiceAiCommand(prompt) {
         ledger: restored.next,
         message: `↩️ Restored ${restored.restoredCount} expense(s) from your last removal. ✅`
       };
+    }
+
+    if (action === "setBudget") {
+      const amount = Number(result.amount);
+      if (!(amount >= 0)) return null;
+      const nextLedger = writeMonthlyBudget(amount);
+      if (!nextLedger) return null;
+      return { ledger: nextLedger, message: `💰 Monthly budget set to ₹${fmt(amount)}.` };
     }
 
     if (action === "setGoal") {
@@ -945,8 +989,9 @@ export default function PennyChat() {
 
       let replyText;
       const undo = parseUndoCommand(text);
-      const goal = undo ? null : parseGoalCommand(text);
-      const limit = !undo && !goal ? parseLimitCommand(text) : null;
+      const budget = undo ? null : parseBudgetCommand(text);
+      const goal = !undo && !budget ? parseGoalCommand(text) : null;
+      const limit = !undo && !budget && !goal ? parseLimitCommand(text) : null;
       const removal = !undo && !goal && !limit ? parseRemoveCommand(text) : null;
       const expense = !undo && !goal && !limit && !removal ? parseExpenseCommand(text) : null;
 
@@ -957,6 +1002,16 @@ export default function PennyChat() {
           replyText = `↩️ Restored ${restored.restoredCount} expense(s) from your last removal. Back on the dashboard! ✅`;
         } else {
           replyText = "🤷 There's nothing left to undo — I don't have any recent removals stored.";
+        }
+      } else if (budget) {
+        const nextLedger = writeMonthlyBudget(budget.amount);
+        if (nextLedger) {
+          setSiteData({ ...currentData, ledger: nextLedger });
+          replyText =
+            `💰 Done! Your monthly budget is now **₹${budget.amount.toLocaleString("en-IN")}**.\n\n` +
+            `The dashboard now shows what's left against this budget. 💪`;
+        } else {
+          replyText = "⚠️ I understood the budget, but couldn't save it (storage may be blocked). Try setting it in the dashboard settings.";
         }
       } else if (goal) {
         const nextLedger = writeSavingsGoal(goal.amount);

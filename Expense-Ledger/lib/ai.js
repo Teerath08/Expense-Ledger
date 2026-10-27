@@ -10,9 +10,10 @@ export const LEDGER_AI_SYSTEM =
   "2. If they want to REMOVE/DELETE an expense: {action: 'delete', query: 'string'}\n" +
   "   - If they want to REMOVE ALL expenses / clear the whole ledger ('remove all expenses', 'clear everything'): {action: 'clearAll'}\n" +
   "   - If they want to UNDO / RESTORE the recently removed expenses ('undo', 'bring back the expenses I removed'): {action: 'undo'}\n" +
-  "3. If they want to SET or CHANGE the MONTHLY SAVINGS GOAL (the word goal/target): {action: 'setGoal', amount: number}\n" +
-  "4. If they want to SET or CHANGE a CATEGORY SPENDING LIMIT (the word limit/budget, one category or ALL): {action: 'setLimit', category: 'all|food|transport|shopping|bills|entertainment|health|other', amount: number}\n" +
-  "5. If you are unsure: {action: 'unknown'}\n\n" +
+  "3. If they want to SET or CHANGE the MONTHLY SAVINGS GOAL (the words goal/target/milestone): {action: 'setGoal', amount: number}\n" +
+  "4. If they want to SET or CHANGE the OVERALL MONTHLY BUDGET (the words 'monthly budget', 'total budget', or just 'budget' when NO category is named): {action: 'setBudget', amount: number}\n" +
+  "5. If they want to SET or CHANGE a CATEGORY SPENDING LIMIT (the word limit, or budget WITH a category named like 'food budget'): {action: 'setLimit', category: 'all|food|transport|shopping|bills|entertainment|health|other', amount: number}\n" +
+  "6. If you are unsure: {action: 'unknown'}\n\n" +
   "Rules: amounts are INR numbers without commas; category MUST be one of the listed ids, never an item name; reason is a short item description. Return ONLY JSON. No markdown, no explanation.";
 
 /* The AI occasionally replies with single-quoted JSON or markdown fences
