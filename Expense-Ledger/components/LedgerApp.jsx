@@ -923,7 +923,8 @@ export default function LedgerApp() {
   async function handleMagicAdd(commandOverride) {
     const promptText = (commandOverride ?? magicInput).trim();
     if (!promptText) return;
-    if (typeof commandOverride !== "string") setMagicInput(promptText);
+    /* Show what was heard (mic or typed) while the command runs. */
+    setMagicInput(promptText);
     setIsMagicLoading(true);
     setFormError("");
 
@@ -989,10 +990,22 @@ export default function LedgerApp() {
           setMagicInput("");
         }, 600);
       } else if (action === "delete") {
-        const query = (result.query || "").toLowerCase();
         const current = ledgerRef.current;
 
-        if (!query) {
+        /* Generic words must never fuzzy-match entry reasons ("all" would hit
+           "small ball") — match by meaningful tokens only. */
+        const REMOVE_STOPWORDS = new Set([
+          "all", "everything", "entire", "whole", "expenses", "expense", "entries", "entry",
+          "transactions", "transaction", "ledger", "spending", "history", "records", "record",
+          "thing", "things", "it", "them", "that", "this", "they",
+          "the", "my", "a", "an", "please", "and", "from"
+        ]);
+        const tokens = (result.query || "").toLowerCase()
+          .split(" ")
+          .filter(Boolean)
+          .filter(token => !REMOVE_STOPWORDS.has(token));
+
+        if (!tokens.length) {
           showToast("🔍 Please specify what to remove");
           setMagicInput("");
           return;
@@ -1002,19 +1015,18 @@ export default function LedgerApp() {
         const filteredEntries = current.entries.filter(entry => {
           const reason = (entry.reason || "").toLowerCase();
           const category = (CAT.get(entry.category)?.label || "").toLowerCase();
-          return !reason.includes(query) && !category.includes(query);
+          return !tokens.some(token => token.length > 2 && (reason.includes(token) || category.includes(token)));
         });
 
         if (filteredEntries.length === originalEntries.length) {
           showToast(`🔍 Couldn't find "${result.query}" to remove`);
-          setMagicInput("");
         } else {
           const removedEntries = originalEntries.filter(entry => !filteredEntries.includes(entry));
           pushUndoSnapshot(removedEntries);
           commitLedger({ ...current, entries: filteredEntries });
-          setMagicInput("");
           showToast(`🗑️ AI removed ${removedEntries.length} expense(s) — say 'undo' to restore`);
         }
+        setMagicInput("");
       } else if (action === "clearAll") {
         const current = ledgerRef.current;
         const count = current.entries.length;
@@ -1171,13 +1183,13 @@ export default function LedgerApp() {
     }
     recognitionRef.current = controller;
 
-      showToast("🎙️ Listening in record mode… speak your command, press ⏹ when done");
-      try {
-        controller.start();
-      } catch (error) {
-        setIsListening(false);
-      }
+    showToast("🎙️ Listening in record mode… speak your command, press ⏹ when done");
+    try {
+      controller.start();
+    } catch (error) {
+      setIsListening(false);
     }
+  }
 
   function handleCardMouseMove(e) {
     if (prefersReducedMotion()) return;

@@ -895,14 +895,6 @@ export default function PennyChat() {
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => {
-    const sync = () => setDarkMode(document.documentElement.classList.contains("dark"));
-    sync();
-    const observer = new MutationObserver(sync);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-    return () => observer.disconnect();
-  }, []);
-
   // Sync with localStorage & custom events
   useEffect(() => {
     setMounted(true);
@@ -1115,10 +1107,10 @@ export default function PennyChat() {
 
   const handleCopyFullContext = () => {
     const fullText = buildFullWebsiteContextText(analysis);
-    navigator.clipboard.writeText(fullText).then(() => {
+    navigator.clipboard?.writeText(fullText).then(() => {
       setCopiedToast(true);
       setTimeout(() => setCopiedToast(false), 2800);
-    });
+    }).catch(() => {});
   };
 
   /* Voice input via the Web Speech API. Mic permission is probed first so a
@@ -1134,10 +1126,15 @@ export default function PennyChat() {
       return;
     }
     if (isVoiceListening) {
-      /* UI must end instantly on ⏹; transcription continues in background. */
+      /* UI must end instantly on ⏹; transcription continues in background.
+         Never park the placeholder in the input — it could be sent as text. */
       clearMicGlow();
       setVoiceListening(false);
-      setInputValue("⏺ processing audio…");
+      setInputValue("");
+      setMessages(prev => [
+        ...prev,
+        { id: "a_" + Date.now(), role: "assistant", text: "🎙️ Transcribing your recording…" }
+      ]);
       voiceRef.current?.stop();
       return;
     }
