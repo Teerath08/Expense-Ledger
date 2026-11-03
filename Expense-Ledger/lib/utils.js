@@ -1,4 +1,4 @@
-import { CATEGORIES, CAT, DEFAULT_BUDGET, DEFAULT_LIMITS, DEFAULT_SAVINGS_GOAL } from "./constants";
+import { CAT, DEFAULT_SAVINGS_GOAL } from "./constants";
 
 export const pad2 = value => String(value).padStart(2, "0");
 export const monthKeyOf = date => `${date.getFullYear()}-${pad2(date.getMonth() + 1)}`;
@@ -42,24 +42,31 @@ export function timeLabel(ts) {
 export function sanitizeState(raw) {
   const clean = {
     entries: [],
-    budget: DEFAULT_BUDGET,
-    limits: { ...DEFAULT_LIMITS },
+    budgets: {},
     savingsGoal: DEFAULT_SAVINGS_GOAL
   };
   if (!raw || typeof raw !== "object") return clean;
 
-  const budget = Number(raw.budget);
-  if (Number.isFinite(budget) && budget >= 0) clean.budget = round2(budget);
+  /* Per-month budgets: budgets["2026-11"] = 5000. */
+  if (raw.budgets && typeof raw.budgets === "object") {
+    Object.keys(raw.budgets).forEach(key => {
+      if (!/^\d{4}-\d{2}$/.test(key)) return;
+      const value = Number(raw.budgets[key]);
+      if (Number.isFinite(value) && value >= 0 && value <= 100000000) {
+        clean.budgets[key] = round2(value);
+      }
+    });
+  } else {
+    /* Migration: the old single-budget model carries over to the current
+       month so nobody loses their setup after the update. */
+    const legacy = Number(raw.budget);
+    if (Number.isFinite(legacy) && legacy > 0) {
+      clean.budgets[monthKeyOf(new Date())] = round2(legacy);
+    }
+  }
 
   const savingsGoal = Number(raw.savingsGoal);
   if (Number.isFinite(savingsGoal) && savingsGoal >= 0) clean.savingsGoal = round2(savingsGoal);
-
-  if (raw.limits && typeof raw.limits === "object") {
-    CATEGORIES.forEach(category => {
-      const value = Number(raw.limits[category.id]);
-      if (Number.isFinite(value) && value >= 0) clean.limits[category.id] = round2(value);
-    });
-  }
 
   if (Array.isArray(raw.entries)) {
     const seen = new Set();

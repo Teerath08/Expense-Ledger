@@ -664,3 +664,25 @@ button,[role="button"],.chip,.quick-chip,.txn-cat{user-select:none;-webkit-user-
   body,.card,.sum-card,.topbar,.theme-toggle,button,input,select{transition:background-color .3s ease,border-color .3s ease,color .3s ease,box-shadow .3s ease;}
   .theme-toggle-thumb{transition:transform .45s cubic-bezier(.22,1,.36,1),background-color .3s ease,box-shadow .3s ease;}
 }
+
+/* ── MONTH-CHANGE CALENDAR FLIP ─────────────────────────────────── */
+/* The whole month view remounts on navigation (keyed by month) — the
+   incoming page rolls in like a calendar page attaching/peeling away,
+   with direction following the arrow you pressed. */
+.month-flow{min-width:0;}
+.month-flow.flow-next{animation:pageAttachNext .48s cubic-bezier(.2,.8,.2,1) both;}
+.month-flow.flow-prev{animation:pageAttachPrev .48s cubic-bezier(.2,.8,.2,1) both;}
+@keyframes pageAttachNext{
+  from{opacity:.26;transform:perspective(1200px) rotateY(15deg) translateX(46px) scale(.988);transform-origin:left center;}
+  to{opacity:1;transform:none;}
+}
+@keyframes pageAttachPrev{
+  from{opacity:.26;transform:perspective(1200px) rotateY(-15deg) translateX(-46px) scale(.988);transform-origin:right center;}
+  to{opacity:1;transform:none;}
+}
+/* The month caption flips like a desk-calendar leaf when the key changes */
+.month-label{animation:monthLabelFlip .42s cubic-bezier(.2,.8,.2,1) both;}
+@keyframes monthLabelFlip{
+  from{opacity:.2;transform:perspective(600px) rotateX(48deg);}
+  to{opacity:1;transform:none;}
+}

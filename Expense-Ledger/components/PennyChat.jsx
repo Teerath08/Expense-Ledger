@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { CATEGORIES, STORAGE_KEY, LANG_KEY, TOUR_SEEN_KEY } from "../lib/constants";
-import { sanitizeState, uid } from "../lib/utils";
+import { CATEGORIES, STORAGE_KEY, LANG_KEY, TOUR_SEEN_KEY, getMonthBudget, setMonthBudget } from "../lib/constants";
+import { sanitizeState, uid, monthKeyOf } from "../lib/utils";
 import { createVoiceSession, ensureMicPermission, micErrorMessage, normalizeVoiceText } from "../lib/voice";
 import { LEDGER_AI_SYSTEM, parseAiJson } from "../lib/ai";
 import { mergeUndoEntries, popUndoSnapshot, pushUndoSnapshot } from "../lib/undo";
@@ -110,12 +110,13 @@ function parseGoalCommand(text) {
   return { amount };
 }
 
-/* Persist a new overall monthly budget and notify the app. */
+/* Persist this month's overall budget and notify the app. */
 function writeMonthlyBudget(amount) {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const ledger = sanitizeState(raw ? JSON.parse(raw) : null);
-    const next = { ...ledger, budget: amount };
+    const key = monthKeyOf(new Date());
+    const next = { ...ledger, budgets: setMonthBudget(ledger, key, amount) };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     window.dispatchEvent(new CustomEvent("pocketwise_ledger_change", { detail: next }));
     return next;
@@ -125,7 +126,7 @@ function writeMonthlyBudget(amount) {
 }
 
 /* Understand commands like "set my monthly budget to 5000" or "change budget 3000".
-   A budget naming a category ("food budget") belongs to parseLimitCommand instead. */
+   Commands naming a category (e.g. "spent 300 on food") are handled elsewhere. */
 function parseBudgetCommand(text) {
   const lower = text.toLowerCase();
 
@@ -166,55 +167,6 @@ function parseUndoCommand(text) {
   const lower = text.toLowerCase();
   if (!/\b(undo|revert|restore|bring back|put back)\b/.test(lower)) return null;
   return { wantsUndo: true };
-}
-
-/* Understand limit commands like "set food limit 3000",
-   "change limit of all categories to 1000" or "increase shopping limit to 2000". */
-function parseLimitCommand(text) {
-  const lower = text.toLowerCase();
-
-  if (!/\blimits?\b/.test(lower)) return null;
-  if (!/\b(set|change|update|make|fix|edit|adjust|increase|decrease|reduce|raise|keep|allocate|now)\b/.test(lower)) return null;
-
-  const numbers = [...lower.matchAll(/(?:₹|rs\.?|inr)?"?(\d[\d,]*(?:\.\d+)?)"?/g)]
-    .map(match => Number(match[1].replace(/,/g, "")))
-    .filter(Number.isFinite);
-  if (!numbers.length) return null;
-  const amount = numbers[numbers.length - 1];
-  if (amount < 0 || amount > 100000000) return null;
-
-  let category = "other";
-  if (/\b(all|every|whole|everything|entire)\b/.test(lower)) {
-    category = "all";
-  } else {
-    let found = null;
-    for (const [id, keywords] of CATEGORY_KEYWORDS) {
-      if (keywords.some(keyword => lower.includes(keyword))) {
-        found = id;
-        break;
-      }
-    }
-    category = found && found !== "other" ? found : (/(\bother\b|misc)/.test(lower) ? "other" : found);
-  }
-  if (!category) return null;
-  return { category, amount };
-}
-
-function writeCategoryLimit(category, amount) {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const ledger = sanitizeState(raw ? JSON.parse(raw) : null);
-    const nextLimits =
-      category === "all"
-        ? Object.fromEntries(CATEGORIES.map(item => [item.id, amount]))
-        : { ...ledger.limits, [category]: amount };
-    const next = { ...ledger, limits: nextLimits };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    window.dispatchEvent(new CustomEvent("pocketwise_ledger_change", { detail: next }));
-    return next;
-  } catch (error) {
-    return null;
-  }
 }
 
 /* Understand remove commands like "remove pizza", "delete 250",
@@ -398,25 +350,6 @@ async function runVoiceAiCommand(prompt) {
       return { ledger: nextLedger, message: `🎯 Monthly savings goal set to ₹${fmt(amount)}.` };
     }
 
-    if (action === "setLimit") {
-      const amount = Number(result.amount);
-      if (!(amount >= 0)) return null;
-      const category = result.category === "all"
-        ? "all"
-        : (CATEGORIES.some(item => item.id === result.category) ? result.category : null);
-      if (!category) return null;
-      const nextLedger = writeCategoryLimit(category, amount);
-      if (!nextLedger) return null;
-      const cat = CATEGORIES.find(item => item.id === category);
-      return {
-        ledger: nextLedger,
-        message:
-          category === "all"
-            ? `🎚️ All category limits set to ₹${fmt(amount)} each.`
-            : `🎚️ ${cat?.icon || ""} ${cat?.label || category} limit set to ₹${fmt(amount)}.`
-      };
-    }
-
     return null;
   } catch (error) {
     return null;
@@ -426,8 +359,7 @@ async function runVoiceAiCommand(prompt) {
 function analyzeFullWebsite(data) {
   const { ledger, lang, tourSeen } = data || {};
   const entries = ledger?.entries || [];
-  const budget = Number(ledger?.budget) || 0;
-  const limits = ledger?.limits || {};
+  const budget = getMonthBudget(ledger, monthKeyOf(new Date()));
 
   const totalSpent = entries.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
   const remainingBudget = budget > 0 ? budget - totalSpent : null;
@@ -439,7 +371,6 @@ function analyzeFullWebsite(data) {
       ...cat,
       spent: 0,
       count: 0,
-      limit: Number(limits[cat.id]) || 0,
       entries: []
     };
   });
@@ -464,14 +395,6 @@ function analyzeFullWebsite(data) {
 
   const recentEntries = [...entries].sort((a, b) => b.ts - a.ts);
 
-  const overBudgetCategories = Object.values(categoryMap).filter(
-    c => c.limit > 0 && c.spent > c.limit
-  );
-
-  const nearBudgetCategories = Object.values(categoryMap).filter(
-    c => c.limit > 0 && c.spent <= c.limit && (c.spent / c.limit) >= 0.8
-  );
-
   return {
     entries,
     entryCount: entries.length,
@@ -486,8 +409,6 @@ function analyzeFullWebsite(data) {
     smallestExpense,
     averageExpense,
     recentEntries,
-    overBudgetCategories,
-    nearBudgetCategories,
     lang,
     tourSeen
   };
@@ -529,14 +450,12 @@ function buildFullWebsiteContextText(analysis) {
     lines.push("• Overall Budget: Not set");
   }
 
-  lines.push("\n📊 Category Limits & Spending:");
+  lines.push("\n📊 Category Spending:");
   CATEGORIES.forEach(c => {
     const data = analysis.categoryMap[c.id];
     const spent = data?.spent || 0;
-    const limit = data?.limit || 0;
     const count = data?.count || 0;
-    const limitStr = limit > 0 ? ` / ${formatCurrency(limit)} limit` : " (No limit set)";
-    lines.push(`  ${c.icon} ${c.label}: ${formatCurrency(spent)} (${count} items)${limitStr}`);
+    lines.push(`  ${c.icon} ${c.label}: ${formatCurrency(spent)} (${count} items)`);
   });
 
   if (analysis.entries.length > 0) {
@@ -695,9 +614,6 @@ function generatePennyReply(rawPrompt, analysis) {
     }
 
     const pct = analysis.totalSpent > 0 ? Math.round((data.spent / analysis.totalSpent) * 100) : 0;
-    const limitInfo = data.limit > 0
-      ? `\n• Category Limit: ${formatCurrency(data.limit)} (${data.spent > data.limit ? `⚠️ Exceeded by ${formatCurrency(data.spent - data.limit)}` : `✅ ${formatCurrency(data.limit - data.spent)} remaining`})`
-      : "";
 
     const topItems = [...data.entries].sort((a, b) => b.amount - a.amount).slice(0, 3);
     const topItemsText = topItems
@@ -707,7 +623,6 @@ function generatePennyReply(rawPrompt, analysis) {
     return `Here is your spending for ${categoryMatch.icon} ${categoryMatch.label}:\n\n` +
       `• Total Spent: ${formatCurrency(data.spent)} (${pct}% of your total expenses)\n` +
       `• Transactions: ${data.count} items recorded` +
-      limitInfo +
       `\n\n📌 Top entries:\n${topItemsText}`;
   }
 
@@ -784,10 +699,10 @@ function generatePennyReply(rawPrompt, analysis) {
       (analysis.budget > 0
         ? `• Budget: ${formatCurrency(analysis.budget)} (${formatCurrency(analysis.remainingBudget)} remaining · ${analysis.budgetUsagePercent}% used)\n`
         : "") +
-      `\nTop Spending Categories:\n${catList}\n\n` +
-      (analysis.overBudgetCategories.length > 0
-        ? `⚠️ Over-budget categories: ${analysis.overBudgetCategories.map(c => `${c.icon} ${c.label}`).join(", ")}`
-        : `✅ All category limits are currently respected!`);
+      `\nTop Spending Categories:\n${catList}` +
+      (analysis.topCategory
+        ? `\n\n🔥 Biggest slice: ${analysis.topCategory.icon} ${analysis.topCategory.label} — a fresh monthly budget keeps it in check!`
+        : "");
   }
 
   // 8. Savings tips / Advice
@@ -811,7 +726,7 @@ function generatePennyReply(rawPrompt, analysis) {
     } else if (topCat?.id === "bills") {
       customTip = "Your top spending is in Bills & Utilities 🧾. Audit recurring app subscriptions and optimize mobile recharge plans.";
     } else {
-      customTip = "Set category limits for your recurring costs so PocketWise alerts you before you overspend!";
+      customTip = "Set a fresh budget for your recurring costs each month so PocketWise shows exactly what's left to spend!";
     }
 
     let coachingNote = "";
@@ -860,7 +775,7 @@ export default function PennyChat() {
     {
       id: "welcome",
       role: "assistant",
-      text: "Hi, I'm Penny! 🪙\nI'm connected to all information in PocketWise — including your expenses, category limits, budget, and website features. How can I help you today?"
+      text: "Hi, I'm Penny! 🪙\nI'm connected to all information in PocketWise — including your expenses, monthly budgets, savings goal, and website features. How can I help you today?"
     }
   ]);
   const [inputValue, setInputValue] = useState("");
@@ -983,9 +898,8 @@ export default function PennyChat() {
       const undo = parseUndoCommand(text);
       const budget = undo ? null : parseBudgetCommand(text);
       const goal = !undo && !budget ? parseGoalCommand(text) : null;
-      const limit = !undo && !budget && !goal ? parseLimitCommand(text) : null;
-      const removal = !undo && !goal && !limit ? parseRemoveCommand(text) : null;
-      const expense = !undo && !goal && !limit && !removal ? parseExpenseCommand(text) : null;
+      const removal = !undo && !budget && !goal ? parseRemoveCommand(text) : null;
+      const expense = !undo && !budget && !goal && !removal ? parseExpenseCommand(text) : null;
 
       if (undo) {
         const restored = restoreUndoSnapshot();
@@ -1018,18 +932,6 @@ export default function PennyChat() {
               : `The goal has been cleared to ₹0 — set it again anytime.`);
         } else {
           replyText = "⚠️ I understood the goal, but couldn't save it (storage may be blocked). Try changing it in the dashboard settings.";
-        }
-      } else if (limit) {
-        const nextLedger = writeCategoryLimit(limit.category, limit.amount);
-        if (nextLedger) {
-          setSiteData({ ...currentData, ledger: nextLedger });
-          const cat = CATEGORIES.find(item => item.id === limit.category);
-          replyText =
-            limit.category === "all"
-              ? `🎚️ Done! The limit for **all categories** is now **₹${limit.amount.toLocaleString("en-IN")}** each. The dashboard reflects it right away.`
-              : `🎚️ Done! The ${cat?.icon || ""} ${cat?.label || limit.category} limit is now **₹${limit.amount.toLocaleString("en-IN")}**. The dashboard reflects it right away.`;
-        } else {
-          replyText = "⚠️ I understood the limit, but couldn't save it (storage may be blocked). Try changing it in the dashboard settings.";
         }
       } else if (removal) {
         if (removal.clearAll) {
@@ -1086,7 +988,7 @@ export default function PennyChat() {
           replyText = executed.message;
         } else {
           replyText =
-            "🤔 I couldn't understand that command. Try: 'add 250 for pizza', 'remove snacks', 'set monthly goal to 5000' or 'set food limit to 3000'.";
+            "🤔 I couldn't understand that command. Try: 'add 250 for pizza', 'remove snacks', 'set monthly budget to 5000' or 'set monthly goal to 3000'.";
         }
       }
 

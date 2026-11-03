@@ -6,10 +6,13 @@ import {
   CATEGORIES,
   CAT,
   LANG_KEY,
+  MONTH_NOTICE_KEY,
   QUICK_AMOUNTS,
   STORAGE_KEY,
   TOUR_SEEN_KEY,
-  emptyLedger
+  emptyLedger,
+  getMonthBudget,
+  setMonthBudget
 } from "../lib/constants";
 import { I18N, TOUR_STEPS } from "../lib/i18n";
 import {
@@ -63,6 +66,7 @@ export default function LedgerApp() {
   const [themeAnimating, setThemeAnimating] = useState(false);
   const [ledger, setLedger] = useState(emptyLedger);
   const [view, setView] = useState(() => startOfMonth(new Date()));
+  const [flowDir, setFlowDir] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [activeCategory, setActiveCategory] = useState("food");
   const [filter, setFilter] = useState({ q: "", cat: "all" });
@@ -73,7 +77,6 @@ export default function LedgerApp() {
   const [storageOK, setStorageOK] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [budgetDraft, setBudgetDraft] = useState("0");
-  const [limitDrafts, setLimitDrafts] = useState(() => ({ ...emptyLedger().limits }));
   const [savingsGoalDraft, setSavingsGoalDraft] = useState(() => String(emptyLedger().savingsGoal));
   const [toast, setToast] = useState(null);
   const [newEntryId, setNewEntryId] = useState(null);
@@ -102,6 +105,7 @@ export default function LedgerApp() {
 
   const ledgerRef = useRef(emptyLedger());
   const storageRef = useRef(true);
+  const viewRef = useRef(view);
   const amountRef = useRef(null);
   const amountWrapRef = useRef(null);
   const descRef = useRef(null);
@@ -188,8 +192,7 @@ export default function LedgerApp() {
 
       ledgerRef.current = next;
       setLedger(next);
-      setBudgetDraft(String(next.budget));
-      setLimitDrafts({ ...next.limits });
+      setBudgetDraft(String(getMonthBudget(next, monthKeyOf(viewRef.current)) || 0));
       setSavingsGoalDraft(String(next.savingsGoal));
     };
 
@@ -290,8 +293,7 @@ export default function LedgerApp() {
     setStorageOK(ok);
     setLang(savedLanguage);
     setLedger(nextLedger);
-    setBudgetDraft(String(nextLedger.budget));
-    setLimitDrafts({ ...nextLedger.limits });
+    setBudgetDraft(String(getMonthBudget(nextLedger, monthKeyOf(new Date())) || 0));
     setSavingsGoalDraft(String(nextLedger.savingsGoal));
     setReady(true);
 
@@ -314,6 +316,60 @@ export default function LedgerApp() {
       clearTimeout(autoTourTimerRef.current);
     };
   }, []);
+
+  /* Keep the mirror in sync so event listeners never read a stale month, and
+     make the budget draft follow whichever month is on screen. */
+  useEffect(() => {
+    viewRef.current = view;
+    setBudgetDraft(String(getMonthBudget(ledgerRef.current, monthKeyOf(view)) || 0));
+  }, [view]);
+
+  /* Month rollover notice: fires once per calendar month — on boot and again
+     the moment the app regains focus inside a new month. Announces that the
+     previous month ended, then jumps to the fresh month. */
+  useEffect(() => {
+    if (!ready || !storageRef.current) return undefined;
+
+    const monthName = date =>
+      date.toLocaleDateString(lang === "hi" ? "hi-IN" : "en-IN", {
+        month: "long",
+        year: "numeric",
+        numberingSystem: "latn"
+      });
+
+    const checkMonth = () => {
+      const key = monthKeyOf(new Date());
+      let stored = null;
+      try {
+        stored = localStorage.getItem(MONTH_NOTICE_KEY);
+        if (stored === key) return;
+        localStorage.setItem(MONTH_NOTICE_KEY, key);
+      } catch (error) {
+        return;
+      }
+      /* First ever run just records the month; every later transition announces. */
+      if (!stored) return;
+
+      const previousMonth = new Date();
+      previousMonth.setDate(1);
+      previousMonth.setMonth(previousMonth.getMonth() - 1);
+      setView(startOfMonth(new Date()));
+      showToast(
+        t("newMonthToast", { prev: monthName(previousMonth), month: monthName(new Date()) })
+      );
+    };
+
+    checkMonth();
+    const onFocus = () => checkMonth();
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    const timer = setInterval(checkMonth, 60000);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+      clearInterval(timer);
+    };
+  }, [ready, lang, t]);
 
   useEffect(() => {
     document.documentElement.lang = lang;
@@ -428,6 +484,9 @@ export default function LedgerApp() {
     numberingSystem: "latn"
   });
 
+  const viewMonthKey = monthKeyOf(view);
+  const monthBudget = getMonthBudget(ledger, viewMonthKey);
+
   const monthEntries = useMemo(() => {
     const key = monthKeyOf(view);
     return ledger.entries
@@ -436,9 +495,9 @@ export default function LedgerApp() {
   }, [ledger.entries, view]);
 
   const spent = round2(monthEntries.reduce((sum, entry) => sum + entry.amount, 0));
-  const left = ledger.budget > 0 ? round2(ledger.budget - spent) : 0;
-  const hasBudget = ledger.budget > 0;
-  const budgetPct = hasBudget ? Math.round((spent / ledger.budget) * 100) : 0;
+  const left = monthBudget > 0 ? round2(monthBudget - spent) : 0;
+  const hasBudget = monthBudget > 0;
+  const budgetPct = hasBudget ? Math.round((spent / monthBudget) * 100) : 0;
   const daysLeft = daysInMonth(now) - now.getDate() + 1;
 
   const netSavings = Math.max(0, left);
@@ -475,7 +534,7 @@ export default function LedgerApp() {
   const pickVariant = (variants) => variants[statusSeed % variants.length];
 
   const status = (() => {
-    if (ledger.budget <= 0) {
+    if (monthBudget <= 0) {
       const variants = [t("statusNoBudget")];
       return { tone: "neutral", icon: "💡", text: pickVariant(variants) };
     }
@@ -534,25 +593,17 @@ export default function LedgerApp() {
       )
       .map(category => {
         const categorySpent = round2(totals[category.id]);
-        const limit = ledger.limits[category.id];
-        const hasLimit = limit > 0;
-        const pct = hasLimit ? (categorySpent / limit) * 100 : 0;
+        const share = spent > 0 ? Math.round((categorySpent / spent) * 100) : 0;
         return {
           ...category,
           label: catLabel(category.id),
           spent: categorySpent,
-          limit,
-          hasLimit,
-          pct,
-          fillClass: pct > 100 ? "over" : pct >= 70 ? "warn" : "",
-          width: hasLimit && categorySpent > 0 ? Math.max(Math.min(100, pct), 2) : 0,
-          valueText: hasLimit
-            ? `${money(categorySpent)} / ${money(limit)}`
-            : `${money(categorySpent)} · ${t("noLimit")}`,
-          over: hasLimit && categorySpent > limit
+          fillClass: "",
+          width: categorySpent > 0 ? Math.max(Math.min(100, share), 2) : 0,
+          valueText: spent > 0 ? `${money(categorySpent)} · ${share}%` : `${money(categorySpent)}`
         };
       });
-  }, [monthEntries, ledger.limits, catLabel, dateLocale, t]);
+  }, [monthEntries, spent, catLabel, dateLocale]);
 
   const transactionCounts = useMemo(() => {
     const counts = {};
@@ -763,44 +814,35 @@ export default function LedgerApp() {
     const target = new Date(view.getFullYear(), view.getMonth() + delta, 1);
     if (target > startOfMonth(new Date())) return;
     if (editingId) resetForm();
+    setFlowDir(delta > 0 ? "next" : "prev");
     setView(target);
   }
 
   function goToday() {
     if (editingId) resetForm();
+    setFlowDir(viewIndex > nowIndex ? "next" : "prev");
     setView(startOfMonth(new Date()));
   }
 
   function syncBudgetDrafts() {
     const current = ledgerRef.current;
-    setBudgetDraft(String(current.budget));
-    setLimitDrafts({ ...current.limits });
+    setBudgetDraft(String(getMonthBudget(current, monthKeyOf(view)) || 0));
     setSavingsGoalDraft(String(current.savingsGoal));
   }
 
   function handleBudgetSubmit(event) {
     event.preventDefault();
-    const budget = Number(budgetDraft);
-    if (!Number.isFinite(budget) || budget < 0) {
+    const amount = Number(budgetDraft);
+    if (!Number.isFinite(amount) || amount < 0) {
       showToast(t("toastBudgetError"));
       budgetInputRef.current?.focus();
       return;
     }
-    const limits = {};
-    for (const category of CATEGORIES) {
-      const value = Number(limitDrafts[category.id]);
-      if (!Number.isFinite(value) || value < 0) {
-        showToast(t("toastLimitError", { category: catLabel(category.id) }));
-        document.getElementById(`limit-${category.id}`)?.focus();
-        return;
-      }
-      limits[category.id] = round2(value);
-    }
-    const nextBudget = round2(budget);
-    commitLedger(current => ({ ...current, budget: nextBudget, limits }));
-    setBudgetDraft(String(nextBudget));
-    setLimitDrafts({ ...limits });
-    showToast(t("toastBudgetUpdated"));
+    const key = monthKeyOf(view);
+    const value = round2(amount);
+    commitLedger(current => ({ ...current, budgets: setMonthBudget(current, key, value) }));
+    setBudgetDraft(String(value));
+    showToast(t(key === monthKeyOf(new Date()) ? "toastBudgetUpdated" : "toastBudgetSaved", { month: monthLabel }));
   }
 
   function openSettings() {
@@ -986,7 +1028,7 @@ export default function LedgerApp() {
             setView(startOfMonth(new Date(ts)));
           }
           setNewEntryId(createdId);
-          showToast(`✨ AI added: ${reason}`);
+          showToast(`✨ Penny added ${money(value)} — ${reason}`);
           setMagicInput("");
         }, 600);
       } else if (action === "delete") {
@@ -1024,7 +1066,7 @@ export default function LedgerApp() {
           const removedEntries = originalEntries.filter(entry => !filteredEntries.includes(entry));
           pushUndoSnapshot(removedEntries);
           commitLedger({ ...current, entries: filteredEntries });
-          showToast(`🗑️ AI removed ${removedEntries.length} expense(s) — say 'undo' to restore`);
+          showToast(`🗑️ Penny removed ${removedEntries.length} expense(s) — say 'undo' to restore`);
         }
         setMagicInput("");
       } else if (action === "clearAll") {
@@ -1074,38 +1116,10 @@ export default function LedgerApp() {
         }
 
         const current = ledgerRef.current;
-        commitLedger({ ...current, budget: value });
+        const key = monthKeyOf(view);
+        commitLedger({ ...current, budgets: setMonthBudget(current, key, value) });
         setBudgetDraft(String(value));
-        showToast(`💰 Monthly budget set to ${money(value)}`);
-        setMagicInput("");
-      } else if (action === "setLimit") {
-        const value = round2(Number(result.amount != null ? result.amount : result.limit));
-        if (!Number.isFinite(value) || value < 0) {
-          showToast("❌ Couldn't understand the limit amount. Try 'Set food limit to 3000'");
-          setMagicInput("");
-          return;
-        }
-
-        const current = ledgerRef.current;
-        const target = (result.category === "all") ? "all" : (CAT.has(result.category) ? result.category : null);
-        if (!target) {
-          showToast("❌ Did you mean which category? Try 'all' or eg. 'food'");
-          setMagicInput("");
-          return;
-        }
-
-        const nextLimits =
-          target === "all"
-            ? Object.fromEntries(CATEGORIES.map(category => [category.id, value]))
-            : { ...current.limits, [target]: value };
-
-        commitLedger({ ...current, limits: nextLimits });
-        setLimitDrafts({ ...nextLimits });
-        showToast(
-          target === "all"
-            ? `🎚️ All category limits set to ${money(value)}`
-            : `🎚️ ${catLabel(target)} limit set to ${money(value)}`
-        );
+        showToast(`💰 Budget for ${monthLabel} set to ${money(value)}`);
         setMagicInput("");
       } else {
         showToast("🤔 I'm not sure how to do that. Try 'Add coffee 50' or 'Set monthly budget to 5000'");
@@ -1475,6 +1489,16 @@ export default function LedgerApp() {
   const tourSteps = TOUR_STEPS[lang] || TOUR_STEPS.en;
   const tourStep = tourSteps[Math.min(tourIndex, tourSteps.length - 1)] || tourSteps[0];
   const tourTargetMissing = !tourStep.target;
+
+  /* Incoming month mounts fresh (keyed by month) and rolls in like a
+     calendar page — direction follows the arrow you pressed. */
+  const monthFlowClass = [
+    "month-flow",
+    flowDir === "next" ? "flow-next" : "",
+    flowDir === "prev" ? "flow-prev" : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
   const tourBubbleClass = [
     "tour-bubble",
     tourPlacement,
@@ -1575,7 +1599,7 @@ export default function LedgerApp() {
             >
               ‹
             </button>
-            <span className="month-label" id="monthLabel" aria-live="polite">
+            <span className="month-label" id="monthLabel" key={viewMonthKey} aria-live="polite">
               {monthLabel}
             </span>
             <button
@@ -1604,6 +1628,7 @@ export default function LedgerApp() {
           ⚠️ {t("storageWarning").replace(/^⚠️\s*/, "")}
         </p>
 
+        <div className={monthFlowClass} key={viewMonthKey}>
         <section className="summary" aria-label={t("summaryAria")}>
           <article
             className="sum-card purple budget"
@@ -1614,7 +1639,7 @@ export default function LedgerApp() {
           >
             <div className="card-glare" aria-hidden="true" />
             <div className="sum-label">{t("monthlyBudget")}</div>
-            <div className="sum-value" id="statBudget">{money(ledger.budget)}</div>
+            <div className="sum-value" id="statBudget">{money(monthBudget)}</div>
             <div className="sum-sub">{t("tapEdit")}</div>
             <button
               type="button"
@@ -2000,7 +2025,7 @@ export default function LedgerApp() {
               <div className="rewards-stats">
                 <div className="reward-stat">
                   <span className="reward-label">Income (budget)</span>
-                  <span className="reward-value">{money(ledger.budget)}</span>
+                  <span className="reward-value">{money(monthBudget)}</span>
                 </div>
                 <div className="reward-stat">
                   <span className="reward-label">Expenses</span>
@@ -2073,9 +2098,6 @@ export default function LedgerApp() {
                     <div className="bd-top">
                       <span className="bd-name">
                         <span aria-hidden="true">{category.icon}</span> {category.label}
-                        {category.over ? (
-                          <span className="over-flag">{t("overFlag")}</span>
-                        ) : null}
                       </span>
                       <span className="bd-val">{category.valueText}</span>
                     </div>
@@ -2100,7 +2122,7 @@ export default function LedgerApp() {
                 <div className="settings-body">
                   <form id="budgetForm" noValidate onSubmit={handleBudgetSubmit}>
                     <div className="field">
-                      <label htmlFor="budgetInput">{t("monthlyBudgetLabel")}</label>
+                      <label htmlFor="budgetInput">{t("budgetFor", { month: monthLabel })}</label>
                       <div className="amount-wrap">
                         <span aria-hidden="true">₹</span>
                         <input
@@ -2116,29 +2138,6 @@ export default function LedgerApp() {
                       </div>
                     </div>
                     <p className="hint">{t("budgetHint")}</p>
-                    <div className="limit-grid" id="limitGrid">
-                      {CATEGORIES.map(category => (
-                        <label className="limit-field" key={category.id}>
-                          <span data-limit-label={category.id}>
-                            {category.icon} {catLabel(category.id)}
-                          </span>
-                          <input
-                            type="number"
-                            id={`limit-${category.id}`}
-                            min="0"
-                            step="50"
-                            inputMode="numeric"
-                            value={limitDrafts[category.id]}
-                            onChange={event =>
-                              setLimitDrafts(current => ({
-                                ...current,
-                                [category.id]: event.target.value
-                              }))
-                            }
-                          />
-                        </label>
-                      ))}
-                    </div>
                     <button type="submit" className="btn-primary btn-block" id="saveSettings">
                       {t("saveBudgets")}
                     </button>
@@ -2155,6 +2154,7 @@ export default function LedgerApp() {
               </details>
             </section>
           </aside>
+        </div>
         </div>
 
         <footer className="foot">
