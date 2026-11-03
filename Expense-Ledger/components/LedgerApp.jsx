@@ -60,10 +60,16 @@ function readStoredLedger() {
    despite instructions — parseAiJson (lib/ai.js) handles that defensively. */
 
 export default function LedgerApp() {
+  /* Thumb sweep length — the theme ripple waits exactly this long, so the
+     page only changes after the toggle button has finished moving. */
+  const THUMB_MS = 420;
   const [ready, setReady] = useState(false);
   const [lang, setLang] = useState("en");
   const [darkMode, setDarkMode] = useState(false);
-  const [themeAnimating, setThemeAnimating] = useState(false);
+  /* Theme animation state lives on the DOM (ref), NOT in React — re-rendering
+     this 2000-line component twice per toggle is what made the ripple stutter. */
+  const themeAnimatingRef = useRef(false);
+  const themeBtnRef = useRef(null);
   const [ledger, setLedger] = useState(emptyLedger);
   const [view, setView] = useState(() => startOfMonth(new Date()));
   const [flowDir, setFlowDir] = useState(null);
@@ -79,6 +85,8 @@ export default function LedgerApp() {
   const [budgetDraft, setBudgetDraft] = useState("0");
   const [savingsGoalDraft, setSavingsGoalDraft] = useState(() => String(emptyLedger().savingsGoal));
   const [toast, setToast] = useState(null);
+  /* Big start-of-month announcement shown until the user dismisses it. */
+  const [monthNotice, setMonthNotice] = useState(null);
   const [newEntryId, setNewEntryId] = useState(null);
   const [magicInput, setMagicInput] = useState("");
   const [isMagicLoading, setIsMagicLoading] = useState(false);
@@ -228,31 +236,46 @@ export default function LedgerApp() {
     try { localStorage.setItem("pocketwise_dark_mode", darkMode ? "1" : "0"); } catch (_) {}
   }, [darkMode]);
 
-  function toggleDarkMode(e) {
-    if (themeAnimating) return;
-    setThemeAnimating(true);
+  function toggleDarkMode() {
+    if (themeAnimatingRef.current) return;
+    themeAnimatingRef.current = true;
 
-    const btn = e.currentTarget;
-    const rect = btn.getBoundingClientRect();
-    const x = Math.round(rect.left + rect.width / 2);
-    const y = Math.round(rect.top + rect.height / 2);
+    const btn = themeBtnRef.current;
+    const rect = btn?.getBoundingClientRect();
+    const x = Math.round((rect ? rect.left : 0) + (rect ? rect.width : 0) / 2);
+    const y = Math.round((rect ? rect.top : 0) + (rect ? rect.height : 0) / 2);
     const root = document.documentElement;
+
+    /* Direction is set BEFORE the theme flips so the thumb sweep is keyed on
+       it and plays exactly once — restarting an animation when html.dark
+       changes was causing the "moves right, then jumps, then crawls" glitch. */
+    const goingDark = !darkMode;
+    root.dataset.themeDir = goingDark ? "to-dark" : "to-light";
     root.style.setProperty("--toggle-x", `${x}px`);
     root.style.setProperty("--toggle-y", `${y}px`);
 
-    const goingDark = !darkMode;
-    document.documentElement.dataset.themeDir = goingDark ? "to-dark" : "to-light";
-
     const doSwitch = () => {
       flushSync(() => setDarkMode(goingDark));
+    };
+
+    /* Cleanup that never touches React state — a state update here would
+       re-render the entire dashboard and stutter the animation. */
+    const finishAll = () => {
+      themeAnimatingRef.current = false;
+      btn?.classList.remove("animating");
+      root.classList.remove("theme-switching");
+      delete document.documentElement.dataset.themeDir;
     };
 
     if (
       typeof document.startViewTransition !== "function" ||
       prefersReducedMotion()
     ) {
-      doSwitch();
-      setTimeout(() => setThemeAnimating(false), 500);
+      /* Fallback (no View Transitions): thumb sweeps first, colors flip after. */
+      setTimeout(() => {
+        doSwitch();
+        setTimeout(finishAll, 250);
+      }, THUMB_MS);
       return;
     }
 
@@ -265,14 +288,16 @@ export default function LedgerApp() {
       )
     );
     root.style.setProperty("--toggle-r", `${endRadius}px`);
-    root.classList.add("theme-switching");
 
-    const transition = document.startViewTransition(doSwitch);
-    transition.finished.finally(() => {
-      setThemeAnimating(false);
-      root.classList.remove("theme-switching");
-      delete document.documentElement.dataset.themeDir;
-    });
+    /* DELIBERATE ORDER: the thumb sweeps on the current theme while the page
+       is untouched (live DOM visible, no snapshot freeze), and only when the
+       thumb has landed does the color ripple start — the theme "turns on"
+       right after the button finishes moving, never during or before. */
+    root.classList.add("theme-switching");
+    setTimeout(() => {
+      const transition = document.startViewTransition(doSwitch);
+      transition.finished.finally(finishAll);
+    }, THUMB_MS);
   }
 
   useEffect(() => {
@@ -354,7 +379,7 @@ export default function LedgerApp() {
       previousMonth.setDate(1);
       previousMonth.setMonth(previousMonth.getMonth() - 1);
       setView(startOfMonth(new Date()));
-      showToast(
+      setMonthNotice(
         t("newMonthToast", { prev: monthName(previousMonth), month: monthName(new Date()) })
       );
     };
@@ -600,7 +625,7 @@ export default function LedgerApp() {
           spent: categorySpent,
           fillClass: "",
           width: categorySpent > 0 ? Math.max(Math.min(100, share), 2) : 0,
-          valueText: spent > 0 ? `${money(categorySpent)} · ${share}%` : `${money(categorySpent)}`
+          valueText: `${money(categorySpent)}`
         };
       });
   }, [monthEntries, spent, catLabel, dateLocale]);
@@ -1543,8 +1568,9 @@ export default function LedgerApp() {
             </select>
             <button
               type="button"
-              className={`theme-toggle${themeAnimating ? " animating" : ""}`}
+              className="theme-toggle"
               id="themeToggle"
+              ref={themeBtnRef}
               aria-label={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
               title={darkMode ? "Light Mode" : "Dark Mode"}
               onClick={toggleDarkMode}
@@ -1627,6 +1653,20 @@ export default function LedgerApp() {
         <p className="storage-warn" id="storageNote" hidden={storageOK}>
           ⚠️ {t("storageWarning").replace(/^⚠️\s*/, "")}
         </p>
+
+        {monthNotice && (
+          <div className="month-notice" role="status" aria-live="polite">
+            <span className="month-notice-text">{monthNotice}</span>
+            <button
+              type="button"
+              className="month-notice-close"
+              aria-label="Dismiss month announcement"
+              onClick={() => setMonthNotice(null)}
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         <div className={monthFlowClass} key={viewMonthKey}>
         <section className="summary" aria-label={t("summaryAria")}>

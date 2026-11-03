@@ -128,53 +128,47 @@
   .theme-icon.moon{opacity:0;transform:scale(0.5) rotate(-60deg);}
   html.dark .theme-icon.sun{opacity:0;transform:scale(0.5) rotate(60deg);}
   html.dark .theme-icon.moon{opacity:1;transform:scale(1) rotate(0deg);}
-  /* One springy keyframe covers slide + squash so motion never stalls.
-     html.dark + .animating both apply together (same render), so the stats
-     at animation start already reflect the FINAL theme: final dark = thumb
-     must end on the right (ToDark), final light = back to the left. */
-  .theme-toggle.animating .theme-toggle-thumb{animation:thumbWobbleToLight .6s cubic-bezier(.22,1,.36,1) both;}
-  html.dark .theme-toggle.animating .theme-toggle-thumb{animation:thumbWobbleToDark .6s cubic-bezier(.22,1,.36,1) both;}
-  @keyframes thumbWobbleToDark{
+  /* Thumb sweep is keyed on data-theme-dir (set before the theme flips), so
+     the animation NEVER restarts mid-flight when html.dark changes — one
+     smooth sweep per click. Fallback browsers get the same sweep, then the
+     JS flips colors right as it lands. */
+  html[data-theme-dir="to-light"] .theme-toggle.animating .theme-toggle-thumb{animation:thumbSweepToLight .42s cubic-bezier(.3,1.1,.35,1) both;}
+  html[data-theme-dir="to-dark"] .theme-toggle.animating .theme-toggle-thumb{animation:thumbSweepToDark .42s cubic-bezier(.3,1.1,.35,1) both;}
+  @keyframes thumbSweepToDark{
     0%{transform:translate(0,-50%) scale(1);}
-    22%{transform:translate(-5px,-50%) scale(.74) rotate(-20deg);}
-    55%{transform:translate(24px,-50%) scale(1.16) rotate(12deg);}
-    78%{transform:translate(32px,-50%) scale(.94) rotate(-4deg);}
+    30%{transform:translate(-4px,-50%) scale(.86) rotate(-14deg);}
+    62%{transform:translate(33px,-50%) scale(1.08) rotate(10deg);}
+    82%{transform:translate(27px,-50%) scale(.96) rotate(-3deg);}
     100%{transform:translate(30px,-50%) scale(1) rotate(0deg);}
   }
-  @keyframes thumbWobbleToLight{
+  @keyframes thumbSweepToLight{
     0%{transform:translate(30px,-50%) scale(1);}
-    22%{transform:translate(35px,-50%) scale(.74) rotate(20deg);}
-    55%{transform:translate(6px,-50%) scale(1.16) rotate(-12deg);}
-    78%{transform:translate(-2px,-50%) scale(.94) rotate(4deg);}
+    30%{transform:translate(35px,-50%) scale(.86) rotate(14deg);}
+    62%{transform:translate(-3px,-50%) scale(1.08) rotate(-10deg);}
+    82%{transform:translate(4px,-50%) scale(.96) rotate(3deg);}
     100%{transform:translate(0,-50%) scale(1) rotate(0deg);}
   }
 
-  /* ── VIEW TRANSITIONS — radial ripple from toggle button ─────── */
+  /* ── VIEW TRANSITIONS — color floods from the toggle button ──── */
+  /* The ripple starts only AFTER the thumb sweep finishes (the JS waits
+     THUMB_MS before startViewTransition), so the theme changes the moment
+     the button comes to rest — never lagging behind it. */
   /* Freeze the snapshots: no fade, just hold — one sliding circle does the motion */
   ::view-transition-old(root),
   ::view-transition-new(root){
     animation:none;
     mix-blend-mode:normal;
   }
-  /* Light → Dark: dark theme expands as a circle from the toggle;
-     the outgoing light theme dims slightly so the circle edge feels soft */
-  html[data-theme-dir="to-dark"]::view-transition-new(root){
-    animation:theme-ripple-in 700ms cubic-bezier(.22,1,.36,1) forwards;
-    mix-blend-mode:normal;
-  }
-  html[data-theme-dir="to-dark"]::view-transition-old(root){
-    animation:theme-soft-dim 700ms cubic-bezier(.22,1,.36,1) forwards;
-    mix-blend-mode:normal;
-  }
-  /* Dark → Light: dark circle shrinks away revealing light beneath and
-     fades out fully, so the last pixels never pop off abruptly */
-  html[data-theme-dir="to-light"]::view-transition-old(root){
-    animation:theme-ripple-out 600ms cubic-bezier(.33,0,.2,1) forwards;
-    mix-blend-mode:normal;
-    z-index:1;
-  }
+  /* New theme expands as a circle from the toggle for BOTH directions;
+     the outgoing theme dims slightly so the circle edge feels soft */
+  html[data-theme-dir="to-dark"]::view-transition-new(root),
   html[data-theme-dir="to-light"]::view-transition-new(root){
-    animation:none;
+    animation:theme-ripple-in 480ms cubic-bezier(.22,1,.36,1) forwards;
+    mix-blend-mode:normal;
+  }
+  html[data-theme-dir="to-dark"]::view-transition-old(root),
+  html[data-theme-dir="to-light"]::view-transition-old(root){
+    animation:theme-soft-dim 480ms cubic-bezier(.22,1,.36,1) forwards;
     mix-blend-mode:normal;
   }
   @keyframes theme-ripple-in{
@@ -185,10 +179,6 @@
     from{opacity:1;}
     to  {opacity:.82;}
   }
-  @keyframes theme-ripple-out{
-    from{clip-path:circle(var(--toggle-r,120%) at var(--toggle-x,50%) var(--toggle-y,50%));}
-    to  {clip-path:circle(0px at var(--toggle-x,50%) var(--toggle-y,50%));opacity:0;}
-  }
   /* Expensive backdrop blur + slow color cross-fades pause during the ripple
      so the clip-path animation stays at a steady 60fps. */
   html.theme-switching .topbar{
@@ -197,6 +187,18 @@
   }
   html.theme-switching,
   html.theme-switching body{
+    transition:none !important;
+  }
+  /* Same for every card-level transition — no color cross-fades fighting
+     the ripple for frames (also smooths the switch on browsers without
+     View Transitions, where the live layer is what you see). */
+  html.theme-switching .card,
+  html.theme-switching .sum-card,
+  html.theme-switching .topbar,
+  html.theme-switching button,
+  html.theme-switching input,
+  html.theme-switching select,
+  html.theme-switching .theme-toggle{
     transition:none !important;
   }
   /* Respect reduced-motion — instant switch, no clip-path */
@@ -610,7 +612,11 @@ html.dark .badge.unlocked .badge-label{color:#FCD34D;}
 
 /* Ultra-smooth theme transitions */
 html{transition:background-color .6s ease,color .6s ease;}
-body,.card,.sum-card,.topbar,.theme-toggle,.theme-toggle-thumb,button,input,select{transition:background-color .5s ease,border-color .5s ease,color .5s ease,box-shadow .5s ease,transform .2s ease;}
+/* NOTE: .theme-toggle / .theme-toggle-thumb are deliberately excluded —
+   they keep their own tuned spring transitions above (.45s cubic-bezier);
+   forcing the broad .5s/.2s cross-fades onto them makes the thumb snap
+   and its colors lag behind, which reads as a stutter. */
+body,.card,.sum-card,.topbar,button,input,select{transition:background-color .5s ease,border-color .5s ease,color .5s ease,box-shadow .5s ease,transform .2s ease;}
 
 /* ── ANDROID / TOUCH SMOOTHNESS ─────────────────────────────────── */
 /* Kill 300ms tap delays, tap-flash and long-press text selection */
@@ -663,6 +669,29 @@ button,[role="button"],.chip,.quick-chip,.txn-cat{user-select:none;-webkit-user-
   html{transition:none;}
   body,.card,.sum-card,.topbar,.theme-toggle,button,input,select{transition:background-color .3s ease,border-color .3s ease,color .3s ease,box-shadow .3s ease;}
   .theme-toggle-thumb{transition:transform .45s cubic-bezier(.22,1,.36,1),background-color .3s ease,box-shadow .3s ease;}
+}
+
+/* ── START-OF-MONTH ANNOUNCEMENT BANNER ────────────────────────── */
+.month-notice{
+  display:flex;align-items:center;gap:12px;
+  margin:0 0 18px;
+  padding:14px 16px;
+  border-radius:14px;
+  border:1px solid color-mix(in srgb, var(--primary) 35%, transparent);
+  background:linear-gradient(135deg, color-mix(in srgb, var(--primary) 14%, transparent), color-mix(in srgb, var(--primary) 4%, transparent));
+  box-shadow:0 6px 22px -10px color-mix(in srgb, var(--primary) 45%, transparent);  animation:monthNoticeIn .5s cubic-bezier(.2,.8,.2,1) both;
+}
+.month-notice-text{flex:1;font-size:.95rem;line-height:1.45;font-weight:550;}
+.month-notice-close{
+  flex:none;width:30px;height:30px;border-radius:50%;
+  border:1px solid var(--border);background:var(--card);
+  color:var(--ink);font-size:.85rem;cursor:pointer;
+  opacity:.7;transition:opacity .2s ease,transform .2s ease;
+}
+.month-notice-close:hover,.month-notice-close:focus-visible{opacity:1;transform:scale(1.08);}
+@keyframes monthNoticeIn{
+  from{opacity:0;transform:translateY(-14px) scale(.985);}
+  to{opacity:1;transform:none;}
 }
 
 /* ── MONTH-CHANGE CALENDAR FLIP ─────────────────────────────────── */
